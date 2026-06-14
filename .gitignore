@@ -132,3 +132,4 @@ TestResults/
 # .trae\rules
 .trae
  
+.claude/skills/settings.local.json
