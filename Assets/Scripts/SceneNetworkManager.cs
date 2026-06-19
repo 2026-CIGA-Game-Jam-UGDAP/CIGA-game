@@ -2,13 +2,6 @@ using System;
 using Mirror;
 using UnityEngine;
 
-/// <summary>
-/// 自定义 NetworkManager，承载场景切换模块的全部逻辑：
-/// 接收客户端→服务器的场景切换请求（单条 NetworkMessage，点对点）。
-///
-/// 用法：把它挂到场景里替换掉默认 NetworkManager。
-/// 调用方一律走 SceneLoader.Go(GameScene.XXX)。
-/// </summary>
 public class SceneNetworkManager : NetworkManager
 {
     // 防重入：切换进行中忽略新请求。

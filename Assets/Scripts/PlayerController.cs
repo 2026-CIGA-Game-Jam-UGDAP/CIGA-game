@@ -1,17 +1,7 @@
 using Mirror;
 using UnityEngine;
 
-/// <summary>
-/// 联机 demo 的玩家控制脚本。
-/// 一个文件搞定：移动 + 颜色区分 + 本地 Camera 启用。
-/// 拖到 Player prefab 上，配合 NetworkTransform（位置同步）即可。
-///
-/// 用法：
-///   1. 创建胶囊体 prefab，挂 NetworkIdentity + NetworkTransform + 本脚本
-///   2. 把 prefab 设为 NetworkManager 的 playerPrefab
-///   3. Cinemachine 跟随 Camera 挂在 prefab 子对象上
-///   4. OnStartLocalPlayer 会启用本地 Camera、禁用远端 Camera
-/// </summary>
+
 public class PlayerController : NetworkBehaviour
 {
     [Header("移动")]
@@ -20,26 +10,34 @@ public class PlayerController : NetworkBehaviour
     [SyncVar(hook = nameof(OnColorChanged))]
     public Color playerColor = Color.white;
 
-    /// <summary>本地玩家的 Camera（Cinememachine Virtual Camera 或普通 Camera）。</summary>
-    [Tooltip("每个玩家自己的 Camera（Cinememachine 或普通 Camera）。OnStartLocalPlayer 会启用本地玩家的、禁用远端的。")]
+    [Tooltip("每个玩家自己的 Camera（子对象即可，自动跟随）。OnStartLocalPlayer 启用本地、禁用远端。")]
     public GameObject playerCamera;
+
+    [Header("动画（可选）")]
+    [SerializeField] Animator animator;
 
     // ---- 移动 ----
 
     void Update()
     {
-        if (!isLocalPlayer) return; // 只有本地玩家才能输入控制
+        if (!isLocalPlayer) return;
 
         Vector3 dir = new Vector3(
             Input.GetAxisRaw("Horizontal"),
-            0f,
-            Input.GetAxisRaw("Vertical")
+            Input.GetAxisRaw("Vertical"),
+            0f
         ).normalized;
 
-        if (dir != Vector3.zero)
+        bool moving = dir != Vector3.zero;
+
+        if (moving)
         {
             transform.position += dir * moveSpeed * Time.deltaTime;
         }
+
+        // 动画：有 Animator 才设参数，没有就跳过
+        if (animator != null)
+            animator.SetFloat("Speed", moving ? 1f : 0f);
     }
 
     // ---- 颜色区分 ----
