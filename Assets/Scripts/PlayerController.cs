@@ -16,6 +16,17 @@ public class PlayerController : NetworkBehaviour
     [Header("动画（可选）")]
     [SerializeField] Animator animator;
 
+    // ---- TA 效果引用 ----
+
+    [Header("TA 效果（仅本地玩家生效）")]
+    [SerializeField] CameraShake cameraShake;
+    [SerializeField] DamageIndicator damageIndicator;
+    [SerializeField] SpriteFlash spriteFlash;
+    [SerializeField] DamagePulse damagePulse;
+    [SerializeField] ImpactLines impactLines;
+    [SerializeField] SpawnBounce spawnBounce;
+    [SerializeField] GameObject shockwavePrefab;
+
     // ---- 移动 ----
 
     void Update()
@@ -80,6 +91,10 @@ public class PlayerController : NetworkBehaviour
 
         // 确保颜色已应用（本地玩家首次生成时 hook 可能还没触发）
         ApplyColor(playerColor);
+
+        // 弹性出生动画
+        if (spawnBounce != null)
+            spawnBounce.Play();
     }
 
     // ---- 远端玩家：禁用 Camera ----
@@ -90,5 +105,36 @@ public class PlayerController : NetworkBehaviour
 
         if (!isLocalPlayer && playerCamera != null)
             playerCamera.SetActive(false);
+    }
+
+    // ---- 受击反馈（本地玩家触发，Client-only） ----
+
+    /// <summary>
+    /// 本地玩家受伤时调用。传入伤害来源的世界坐标方向。
+    /// 纯本地效果：抖屏 + 弧形指示 + 闪白 + 缩抖 + 冲击线。
+    /// </summary>
+    public void PlayHitFeedback(Vector3 damageSourceDirection, float shakeIntensity = 1f)
+    {
+        if (!isLocalPlayer) return;
+
+        Vector3 worldDir = (damageSourceDirection - transform.position).normalized;
+
+        if (cameraShake != null) cameraShake.Shake(shakeIntensity);
+        if (damageIndicator != null) damageIndicator.Show(worldDir);
+        if (spriteFlash != null) spriteFlash.Flash();
+        if (damagePulse != null) damagePulse.Play();
+
+        // 冲击线随机旋转（不按方向，每下不一样）
+        if (impactLines != null) impactLines.Play();
+    }
+
+    /// <summary>
+    /// 在指定世界位置播放冲击波。可用于爆炸/大招等。
+    /// 纯本地效果，冲击波自毁。
+    /// </summary>
+    public void PlayShockwave(Vector3 worldPos)
+    {
+        if (shockwavePrefab == null) return;
+        Shockwave.Play(shockwavePrefab, worldPos);
     }
 }

@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>TA 效果配置参考 — CIGA (俯视角 2D, Mirror)</title>
+<style>
+  body { font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; max-width: 960px; margin: 0 auto; padding: 24px; background: #f8f9fa; color: #1a1a2e; line-height: 1.6; }
+  h1 { border-bottom: 3px solid #e94560; padding-bottom: 8px; }
+  h2 { background: #e94560; color: #fff; display: inline-block; padding: 4px 16px; border-radius: 4px; font-size: 1.1rem; margin-top: 32px; }
+  h3 { margin-top: 24px; color: #16213e; border-left: 4px solid #0f3460; padding-left: 12px; }
+  .meta { color: #666; font-size: 0.9rem; margin-bottom: 24px; }
+  .script-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; margin: 16px 0; }
+  .card { background: #fff; border: 1px solid #dee2e6; border-radius: 8px; padding: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .card h4 { margin: 0 0 4px 0; }
+  .card .file { color: #0f3460; font-family: monospace; font-size: 0.85rem; }
+  .card .tag { display: inline-block; background: #e9ecef; padding: 2px 8px; border-radius: 3px; font-size: 0.8rem; margin-right: 4px; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; background: #fff; }
+  th, td { border: 1px solid #dee2e6; padding: 8px 12px; text-align: left; font-size: 0.9rem; }
+  th { background: #16213e; color: #fff; font-weight: 600; }
+  tr:nth-child(even) { background: #f8f9fa; }
+  code { background: #e9ecef; padding: 2px 6px; border-radius: 3px; font-family: monospace; font-size: 0.9rem; }
+  pre { background: #1a1a2e; color: #f8f9fa; padding: 16px; border-radius: 8px; overflow-x: auto; font-size: 0.85rem; line-height: 1.5; }
+  .ins-box { background: #e3f2fd; border-left: 4px solid #1565c0; padding: 12px 16px; margin: 12px 0; border-radius: 4px; }
+  .ins-box strong { color: #1565c0; }
+  .tip { background: #fff3e0; border-left: 4px solid #e65100; padding: 12px 16px; margin: 12px 0; border-radius: 4px; }
+  .caution { background: #fce4ec; border-left: 4px solid #c62828; padding: 12px 16px; margin: 12px 0; border-radius: 4px; }
+  hr { border: none; border-top: 1px solid #dee2e6; margin: 32px 0; }
+  .to-top { text-align: right; font-size: 0.8rem; }
+  ul { padding-left: 20px; }
+  li { margin: 4px 0; }
+</style>
+</head>
+<body>
+
+<h1>🎯 TA 效果配置参考</h1>
+<div class="meta">
+  项目：CIGA · 俯视角 2D · Mirror 联机 · Unity 2022+<br>
+  最后更新：2026/06/20 · 所有脚本位于 <code>Assets/Scripts/</code>
+</div>
+
+<p>本文档覆盖两轮头脑风暴已实现的 8 个脚本 + 3 个粒子预制体配置，
+  每个效果注明 Editor 配置步骤、Inspector 参数、代码调用方式。</p>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2>📌 快速总览</h2>
+
+<div class="script-grid">
+  <div class="card">
+    <h4>📷 摄像头抖动</h4>
+    <div class="file">CameraShake.cs</div>
+    <div><span class="tag">Cinemachine</span><span class="tag">受击</span></div>
+  </div>
+  <div class="card">
+    <h4>🔴 弧形受伤指示</h4>
+    <div class="file">DamageIndicator.cs</div>
+    <div><span class="tag">UI</span><span class="tag">方向性</span></div>
+  </div>
+  <div class="card">
+    <h4>💥 地面冲击波</h4>
+    <div class="file">Shockwave.cs</div>
+    <div><span class="tag">Sprite</span><span class="tag">定时自毁</span></div>
+  </div>
+  <div class="card">
+    <h4>⚡ Sprite 闪白</h4>
+    <div class="file">SpriteFlash.cs</div>
+    <div><span class="tag">受击</span><span class="tag">Renderer</span></div>
+  </div>
+  <div class="card">
+    <h4>🔵 弹性出生</h4>
+    <div class="file">SpawnBounce.cs</div>
+    <div><span class="tag">AnimationCurve</span><span class="tag">生成</span></div>
+  </div>
+  <div class="card">
+    <h4>🌀 受伤缩抖</h4>
+    <div class="file">DamagePulse.cs</div>
+    <div><span class="tag">AnimationCurve</span><span class="tag">受击</span></div>
+  </div>
+  <div class="card">
+    <h4>💫 漫画冲击线</h4>
+    <div class="file">ImpactLines.cs</div>
+    <div><span class="tag">UI</span><span class="tag">受击</span></div>
+  </div>
+  <div class="card">
+    <h4>🔄 道具悬浮旋转</h4>
+    <div class="file">ItemHover.cs</div>
+    <div><span class="tag">自动</span><span class="tag">拾取</span></div>
+  </div>
+  <div class="card" style="border-color: #e94560;">
+    <h4>📋 玩家入口</h4>
+    <div class="file">PlayerController.cs</div>
+    <div><span class="tag">NetworkBehaviour</span><span class="tag">入口</span></div>
+  </div>
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2>🔧 各效果 Editor 配置</h2>
+
+<!-- 1. CameraShake -->
+<h3 id="camshake">1. 摄像头抖动 — CameraShake</h3>
+<table>
+  <tr><th style="width:140px;">文件</th><td><code>Assets/Scripts/CameraShake.cs</code></td></tr>
+  <tr><th>触发方式</th><td><code>cameraShake.Shake()</code> / <code>Shake(float intensity)</code></td></tr>
+</table>
+
+<h4>Editor 配置</h4>
+<ol>
+  <li>在 <strong>Player Prefab</strong> 上添加组件 <code>CameraShake</code></li>
+  <li>在 Player 下建子对象 <code>CameraShakeSource</code>，挂 <strong>CinemachineImpulseSource</strong></li>
+  <li>把 <code>CameraShakeSource</code> 拖到 CameraShake 的 <code>impulseSource</code> 字段</li>
+  <li>在 <strong>Main Camera</strong>（两个场景）添加 <strong>CinemachineImpulseListener</strong><br>
+      <code>Gain</code> = 1（越大越抖），<code>Channel</code> = 1（默认）</li>
+  <li>在 Player 下建 <strong>CinemachineVirtualCamera</strong>（使 CinemachineBrain 有跟随目标）</li>
+  <li>把 ImpulseListener 放到 VirtualCamera 上（注意：ImpulseListener 在 CM 2.x 中需要放在 VirtualCamera 上才能产生抖动效果）</li>
+</ol>
+
+<h4>Inspector 参数</h4>
+<table>
+  <tr><th>参数</th><th>说明</th><th>建议值</th></tr>
+  <tr><td><code>impulseSource</code></td><td>CinemachineImpulseSource 引用</td><td>拖子对象</td></tr>
+  <tr><td><code>defaultIntensity</code></td><td>Shake() 无参时的默认强度</td><td>1.0</td></tr>
+  <tr><td><em>ImpulseSource 上调</em></td><td>Signal Shape、Duration、衰减等</td><td>Shape=Random, Velocity=(1,1,0)</td></tr>
+</table>
+
+<div class="ins-box">
+  <strong>💡 调手感：</strong>ImpulseSource 的 Default Velocity 决定抖动方向。<br>
+  俯视角建议 (1, 1, 0) = XY 平面随机抖，去掉 Z。Impulse Duration 长=晃得久。
+</div>
+
+<div class="to-top"><a href="#">↑ 回顶部</a></div>
+
+<!-- 2. DamageIndicator -->
+<h3 id="dmgindicator">2. 弧形受伤指示 — DamageIndicator</h3>
+<table>
+  <tr><th>文件</th><td><code>Assets/Scripts/DamageIndicator.cs</code></td></tr>
+  <tr><th>触发方式</th><td><code>damageIndicator.Show(Vector3 worldDirection)</code></td></tr>
+</table>
+
+<h4>Editor 配置</h4>
+<ol>
+  <li>在 <strong>GamePlay 场景</strong>新建 Canvas（Screen Space - Overlay）</li>
+  <li>在 Canvas 下新建 UI Image，命名 <code>DamageArc</code></li>
+  <li>Anchors = <strong>stretch/stretch</strong>（填满画布），Pivot = <strong>(0.5, 0.5)</strong></li>
+  <li>把一张 <strong>弧形红光 Sprite</strong>（90° 弧形半透明）拖到 Image 的 Source Image</li>
+  <li>Image 的 Color.Alpha 初始设为 <strong>0</strong></li>
+  <li>在 <strong>Player Prefab</strong> 上添加 <code>DamageIndicator</code></li>
+  <li>把场景中的 <code>DamageArc</code> Image 拖到 <code>arcImage</code> 字段（建议将 DamageArc Image 拖拽到 Player prefab 上转为预制体引用，避免场景引用丢失）</li>
+</ol>
+
+<h4>Inspector 参数</h4>
+<table>
+  <tr><th>参数</th><th>说明</th><th>建议值</th></tr>
+  <tr><td><code>arcImage</code></td><td>弧形 UI Image 引用</td><td>必须拖</td></tr>
+  <tr><td><code>showDuration</code></td><td>全透明度保持时间(秒)</td><td>0.5</td></tr>
+  <tr><td><code>fadeDuration</code></td><td>淡出时间(秒)</td><td>0.3</td></tr>
+  <tr><td><code>maxAlpha</code></td><td>最大透明度</td><td>0.7</td></tr>
+</table>
+
+<div class="tip">
+  <strong>🎨 弧形 Sprite 怎么做？</strong><br>
+  最快：Photoshop/GIMP 画一个 90° 扇形/弧形，红色半透明渐变（边缘亮中心淡），导出 PNG 导入 Unity。<br>
+  没有图也可以先用一张红色矩形 Image ——旋转后虽然不圆但仍能指示方向，后续替换 Sprite 即可。
+</div>
+
+<div class="to-top"><a href="#">↑ 回顶部</a></div>
+
+<!-- 3. Shockwave -->
+<h3 id="shockwave">3. 地面冲击波 — Shockwave</h3>
+<table>
+  <tr><th>文件</th><td><code>Assets/Scripts/Shockwave.cs</code></td></tr>
+  <tr><th>触发方式</th><td><code>Shockwave.Play(prefab, worldPos)</code> 静态方法</td></tr>
+</table>
+
+<h4>Editor 配置</h4>
+<ol>
+  <li>建空 GameObject，命名 <code>Shockwave</code></li>
+  <li>添加 <strong>SpriteRenderer</strong>，挂一张 <strong>圆环 Sprite</strong>（空心圆/径向渐变）</li>
+  <li>添加 <strong>Shockwave</strong> 组件</li>
+  <li>保存为 Prefab 到 <code>Assets/Prefabs/Effects/Shockwave.prefab</code></li>
+  <li>把 Prefab 拖到 PlayerController 的 <code>shockwavePrefab</code> 字段</li>
+</ol>
+
+<h4>Inspector 参数</h4>
+<table>
+  <tr><th>参数</th><th>说明</th><th>建议值</th></tr>
+  <tr><td><code>startRadius</code></td><td>初始缩放（localScale）</td><td>0.2</td></tr>
+  <tr><td><code>targetRadius</code></td><td>最大缩放（localScale）</td><td>5.0</td></tr>
+  <tr><td><code>expandDuration</code></td><td>扩散阶段持续时间</td><td>0.4</td></tr>
+  <tr><td><code>fadeDuration</code></td><td>淡出阶段持续时间</td><td>0.3</td></tr>
+</table>
+
+<div class="caution">
+  <strong>⚠ Sprite 尺寸注意：</strong>shockwave 的缩放 = localScale，不是世界单位。<br>
+  假设 Sprite 的 PPU=100，宽 100px=1 世界单位，targetRadius=5 则最终直径约 5 单位。<br>
+  如果 Sprite 原始尺寸不同，调 targetRadius 直到看上去合适。
+</div>
+
+<div class="to-top"><a href="#">↑ 回顶部</a></div>
+
+<!-- 4. SpriteFlash -->
+<h3 id="spriteflash">4. 受击闪白 — SpriteFlash</h3>
+<table>
+  <tr><th>文件</th><td><code>Assets/Scripts/SpriteFlash.cs</code></td></tr>
+  <tr><th>触发方式</th><td><code>spriteFlash.Flash()</code> / <code>Flash(color, count)</code></td></tr>
+</table>
+
+<h4>Editor 配置</h4>
+<ol>
+  <li>在 <strong>Player Prefab</strong> 上添加 <code>SpriteFlash</code> 组件</li>
+  <li>不需要拖引用——<code>GetComponentInChildren&lt;Renderer&gt;()</code> 自动找</li>
+  <li>把 SpriteFlash 拖到 PlayerController 的 <code>spriteFlash</code> 字段</li>
+</ol>
+
+<h4>Inspector 参数</h4>
+<table>
+  <tr><th>参数</th><th>说明</th><th>建议值</th></tr>
+  <tr><td><code>flashColor</code></td><td>闪烁颜色</td><td>白色 #FFFFFF</td></tr>
+  <tr><td><code>flashDuration</code></td><td>每帧闪烁周期(秒)</td><td>0.1</td></tr>
+  <tr><td><code>flashCount</code></td><td>闪烁次数</td><td>1（闪一次）</td></tr>
+</table>
+
+<div class="ins-box">
+  <strong>💡 SyncVar 注意：</strong>代码临时改 material.color 和 SyncVar 的 playerColor 互不干扰。<br>
+  但若 SyncVar hook 在闪白期间触发，颜色会立即跳到 SyncVar 的值（中断闪白）。<br>
+  48h Jam 里碰到的概率极低，忽略即可。
+</div>
+
+<div class="to-top"><a href="#">↑ 回顶部</a></div>
+
+<!-- 5. SpawnBounce -->
+<h3 id="spawnbounce">5. 弹性出生 — SpawnBounce</h3>
+<table>
+  <tr><th>文件</th><td><code>Assets/Scripts/SpawnBounce.cs</code></td></tr>
+  <tr><th>触发方式</th><td><code>spawnBounce.Play()</code>（已在 OnStartLocalPlayer 中调用）</td></tr>
+</table>
+
+<h4>Editor 配置</h4>
+<ol>
+  <li>在 <strong>Player Prefab</strong> 上添加 <code>SpawnBounce</code> 组件</li>
+  <li>拖到 PlayerController 的 <code>spawnBounce</code> 字段</li>
+  <li>就绪——玩家生成时自动触发弹性出生</li>
+</ol>
+
+<h4>Inspector 参数</h4>
+<table>
+  <tr><th>参数</th><th>说明</th><th>建议值</th></tr>
+  <tr><td><code>bounceCurve</code></td><td>弹性曲线（0→过冲→回弹→1）</td><td>0→1.15→0.95→1.0</td></tr>
+  <tr><td><code>duration</code></td><td>动画总时长(秒)</td><td>0.6</td></tr>
+</table>
+
+<div class="tip">
+  <strong>🎮 调手感：</strong><br>
+  <b>更弹：</b>把曲线第二个点 Y 拉到 1.3~1.4（更大的 overshoot）<br>
+  <b>更干脆：</b>缩短 duration 到 0.3，曲线改为 0→1→1（直冲无过冲）<br>
+  <b>没有 AnimationCurve 操作经验：</b>在 Inspector 里双击曲线打开 Curve Editor，鼠标拖点即可。
+</div>
+
+<div class="to-top"><a href="#">↑ 回顶部</a></div>
+
+<!-- 6. DamagePulse -->
+<h3 id="damagepulse">6. 受伤缩抖 — DamagePulse</h3>
+<table>
+  <tr><th>文件</th><td><code>Assets/Scripts/DamagePulse.cs</code></td></tr>
+  <tr><th>触发方式</th><td><code>damagePulse.Play()</code>（已在 PlayHitFeedback 中调用）</td></tr>
+</table>
+
+<h4>Editor 配置</h4>
+<ol>
+  <li>在 <strong>Player Prefab</strong> 上添加 <code>DamagePulse</code> 组件</li>
+  <li>拖到 PlayerController 的 <code>damagePulse</code> 字段</li>
+  <li>就绪——每次受击自动触发缩放脉冲</li>
+</ol>
+
+<h4>Inspector 参数</h4>
+<table>
+  <tr><th>参数</th><th>说明</th><th>建议值</th></tr>
+  <tr><td><code>pulseCurve</code></td><td>脉冲曲线（1→膨胀→压缩→回稳）</td><td>1→1.25→0.9→1.05→1.0</td></tr>
+  <tr><td><code>duration</code></td><td>动画总时长(秒)</td><td>0.4</td></tr>
+</table>
+
+<div class="tip">
+  <strong>🎮 调手感：</strong><br>
+  <b>肉感膨胀：</b>默认曲线 (1→1.25→0.9→1.05→1) —— 先胀再缩，像被重击<br>
+  <b>硬直感：</b>改成 (1→0.9→1.05→1) —— 先压缩再回弹，像被戳<br>
+  <b>抖动感：</b>加多几个振荡点 (1→1.1→0.95→1.05→0.98→1.0)
+</div>
+
+<div class="to-top"><a href="#">↑ 回顶部</a></div>
+
+<!-- 7. ImpactLines -->
+<h3 id="impactlines">7. 漫画冲击线 — ImpactLines</h3>
+<table>
+  <tr><th>文件</th><td><code>Assets/Scripts/ImpactLines.cs</code></td></tr>
+  <tr><th>触发方式</th><td><code>impactLines.Play()</code>（已在 PlayHitFeedback 中调用）<br>
+                       <code>Play(float angleDegrees)</code>（指定角度）</td></tr>
+</table>
+
+<h4>Editor 配置</h4>
+<ol>
+  <li>在 HUD Canvas（与 DamageIndicator 同一 Canvas）下新建 UI Image，命名 <code>ImpactLine</code></li>
+  <li>找/画一张 <strong>放射状冲击线 Sprite</strong>（白色放射线条，漫画"砰！"爆裂效果）</li>
+  <li>Anchors = <strong>stretch/stretch</strong>，Pivot = <strong>(0.5, 0.5)</strong></li>
+  <li>Image 的 Color.Alpha 初始 = <strong>0</strong></li>
+  <li>在 <strong>Player Prefab</strong> 上添加 <code>ImpactLines</code> 组件</li>
+  <li>把 <code>ImpactLine</code> Image 拖到 <code>impactImage</code> 字段</li>
+  <li>拖到 PlayerController 的 <code>impactLines</code> 字段</li>
+</ol>
+
+<h4>Inspector 参数</h4>
+<table>
+  <tr><th>参数</th><th>说明</th><th>建议值</th></tr>
+  <tr><td><code>impactImage</code></td><td>冲击线 UI Image 引用</td><td>必须拖</td></tr>
+  <tr><td><code>scaleInDuration</code></td><td>弹入时间(秒)</td><td>0.08</td></tr>
+  <tr><td><code>holdDuration</code></td><td>保持可见时间(秒)</td><td>0.12</td></tr>
+  <tr><td><code>fadeDuration</code></td><td>淡出时间(秒)</td><td>0.1</td></tr>
+  <tr><td><code>scaleInCurve</code></td><td>弹入缩放曲线</td><td>0→1.1→1.0（微过冲）</td></tr>
+</table>
+
+<div class="to-top"><a href="#">↑ 回顶部</a></div>
+
+<!-- 8. ItemHover -->
+<h3 id="itemhover">8. 道具悬浮旋转 — ItemHover</h3>
+<table>
+  <tr><th>文件</th><td><code>Assets/Scripts/ItemHover.cs</code></td></tr>
+  <tr><th>触发方式</th><td><strong>无需触发</strong>，挂在有 GameObject 上自动运行</td></tr>
+</table>
+
+<h4>Editor 配置</h4>
+<ol>
+  <li>把 <code>ItemHover</code> 组件拖到可拾取道具的 GameObject 上</li>
+  <li>完成 —— Update 中自动上下浮动 + 自转</li>
+</ol>
+
+<h4>Inspector 参数</h4>
+<table>
+  <tr><th>参数</th><th>说明</th><th>建议值</th></tr>
+  <tr><td><code>floatAmplitude</code></td><td>浮动幅度(世界单位)</td><td>0.3</td></tr>
+  <tr><td><code>floatFrequency</code></td><td>浮动频率(Hz)</td><td>2.0</td></tr>
+  <tr><td><code>rotateSpeed</code></td><td>旋转速度(度/秒)</td><td>90</td></tr>
+  <tr><td><code>rotateOnZ</code></td><td>是否绕 Z 轴旋转（俯视角=Z）</td><td>true</td></tr>
+</table>
+
+<div class="to-top"><a href="#">↑ 回顶部</a></div>
+
+<!-- ============================================================ -->
+<h2>🎇 粒子预制体配置</h2>
+
+<p>以下 3 个效果使用 Unity Particle System，<strong>零代码</strong>——按表在 Inspector 里填参数即可。建好存为 Prefab，需要时 Instantiate。</p>
+
+<!-- 死亡爆散 -->
+<h3 id="particle-death">死亡爆散 — DeathBurst</h3>
+<p>击杀时角色碎片四散，带颜色继承。</p>
+<table>
+  <tr><th>模块</th><th>参数</th><th>值</th></tr>
+  <tr><td><strong>Main</strong></td><td>Duration / Start Lifetime / Start Speed / Start Size / Start Color / Simulation Space / Stop Action</td>
+      <td>0.3 / 0.3–0.6(随机) / 3–6(随机) / 0.05–0.15(随机) / 随机色或继承 / World / <strong>Destroy</strong></td></tr>
+  <tr><td><strong>Emission</strong></td><td>Rate / Bursts</td><td>0 / Count=<strong>30</strong>, Time=0</td></tr>
+  <tr><td><strong>Shape</strong></td><td>Shape / Radius</td><td>Sphere / 0.2</td></tr>
+  <tr><td><strong>Size over Lifetime</strong></td><td>启用 / 曲线</td><td>✓ / 1→0</td></tr>
+  <tr><td><strong>Color over Lifetime</strong></td><td>启用 / Alpha</td><td>✓ / 1→0</td></tr>
+  <tr><td><strong>Renderer</strong></td><td>Material</td><td>Default-Particle</td></tr>
+</table>
+<p><b>用法：</b><code>Instantiate(deathBurstPrefab, position, Quaternion.identity)</code>，StopAction=Destroy 自动回收。</p>
+
+<!-- 移动扬尘 -->
+<h3 id="particle-dust">移动扬尘 — MoveDust</h3>
+<p>角色脚下尘烟，"在跑"的视觉证据。<strong>零代码，挂上即用。</strong></p>
+<table>
+  <tr><th>模块</th><th>参数</th><th>值</th></tr>
+  <tr><td><strong>Main</strong></td><td>Duration / Start Lifetime / Start Speed / Start Size / Start Color / Simulation Space</td>
+      <td>0.5 / 0.2–0.4(随机) / 0.5–1.5(随机) / 0.03–0.08(随机) / 灰白(0.8,0.8,0.8,0.5) / World</td></tr>
+  <tr><td><strong>Emission</strong></td><td>Rate over Time / <b>Rate over Distance</b></td><td>0 / <b>1</b></td></tr>
+  <tr><td><strong>Shape</strong></td><td>Shape / Radius / Align to Direction</td><td>Circle / 0.1 / ✓</td></tr>
+  <tr><td><strong>Size over Lifetime</strong></td><td>启用 / 曲线</td><td>✓ / 1→0.3</td></tr>
+  <tr><td><strong>Color over Lifetime</strong></td><td>启用 / Alpha</td><td>✓ / 0.6→0</td></tr>
+  <tr><td><strong>Renderer</strong></td><td>Material</td><td>Default-Particle</td></tr>
+</table>
+
+<div class="ins-box">
+  <strong>💡 关键技巧：</strong>把 MoveDust ParticleSystem 放在 <strong>Player 的子对象</strong>下。<br>
+  <b>Emission → Rate over Distance = 1</b> 意味着玩家每移动 1 单位距离发射 1 粒尘，<br>
+  站着不动时自动停喷。不！需！要！任！何！脚！本！
+</div>
+
+<!-- 拾取闪光 -->
+<h3 id="particle-sparkle">拾取闪光 — PickupSparkle</h3>
+<table>
+  <tr><th>模块</th><th>参数</th><th>值</th></tr>
+  <tr><td><strong>Main</strong></td><td>Duration / Start Lifetime / Start Speed / Start Size / Start Color / Gravity Modifier / Stop Action</td>
+      <td>0.5 / 0.3–0.8(随机) / 1–4(随机) / 0.03–0.1(随机) / 金色(1,0.8,0,1) / 0.2 / <strong>Destroy</strong></td></tr>
+  <tr><td><strong>Emission</strong></td><td>Rate / Bursts</td><td>0 / Count=<strong>12</strong>, Time=0</td></tr>
+  <tr><td><strong>Shape</strong></td><td>Shape / Radius</td><td>Sphere / 0.3</td></tr>
+  <tr><td><strong>Size over Lifetime</strong></td><td>启用 / 曲线</td><td>✓ / 1→0</td></tr>
+  <tr><td><strong>Color over Lifetime</strong></td><td>启用 / Alpha</td><td>✓ / 1→0</td></tr>
+  <tr><td><strong>Renderer</strong></td><td>Material</td><td>Default-Particle</td></tr>
+</table>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2>🧩 PlayerController — 效果入口</h2>
+
+<p>所有 TA 效果通过 <code>PlayerController</code> 统一接入，两个入口方法：</p>
+
+<h3>受击反馈 — 一次调用触发所有效果</h3>
+<pre>/// 调用示例：当玩家受击时
+playerController.PlayHitFeedback(attackSourcePosition, shakeIntensity: 1f);
+
+// 内部依次触发：
+//   cameraShake.Shake(intensity)       → 抖屏
+//   damageIndicator.Show(worldDir)     → 弧形指示
+//   spriteFlash.Flash()                → 闪白
+//   damagePulse.Play()                 → 缩抖
+//   impactLines.Play()                 → 冲击线</pre>
+
+<h3>冲击波 — 生成地面扩散圆环</h3>
+<pre>/// 调用示例：爆炸/大招时
+playerController.PlayShockwave(explosionPosition);
+
+// 内部：
+//   Shockwave.Play(shockwavePrefab, position)
+//   → Instantiate prefab → 自动扩散 + 淡出 + 自毁</pre>
+
+<h3>Player Inspector 拖引用总表</h3>
+<p>以下所有字段都在 Player Prefab 的 PlayerController 组件上拖好：</p>
+<table>
+  <tr><th>字段</th><th>类型</th><th>来源</th></tr>
+  <tr><td><code>cameraShake</code></td><td>CameraShake</td><td>同 GameObject 上的 CameraShake 组件</td></tr>
+  <tr><td><code>damageIndicator</code></td><td>DamageIndicator</td><td>同 GameObject 上的 DamageIndicator 组件</td></tr>
+  <tr><td><code>spriteFlash</code></td><td>SpriteFlash</td><td>同 GameObject 上的 SpriteFlash 组件</td></tr>
+  <tr><td><code>damagePulse</code></td><td>DamagePulse</td><td>同 GameObject 上的 DamagePulse 组件</td></tr>
+  <tr><td><code>impactLines</code></td><td>ImpactLines</td><td>同 GameObject 上的 ImpactLines 组件</td></tr>
+  <tr><td><code>spawnBounce</code></td><td>SpawnBounce</td><td>同 GameObject 上的 SpawnBounce 组件</td></tr>
+  <tr><td><code>shockwavePrefab</code></td><td>GameObject</td><td>Shockwave 预制体</td></tr>
+</table>
+
+<div class="ins-box">
+  <strong>💡 拖引用技巧：</strong><br>
+  在 Player Prefab 的 Inspector 中选中 PlayerController，把上述组件从 <b>同一 GameObject</b> 的组件列表拖到对应字段——Unity 允许从组件标签头直接拖拽到 SerializeField 字段。<br>
+  操作：点击组件名（如 CameraShake）上方标签头 → 拖拽到 PlayerController 的对应字段。
+</div>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2>🧪 临时测试代码</h2>
+
+<p>在 <code>PlayerController.Update()</code> 的 <code>if (!isLocalPlayer) return;</code> 后面添加：</p>
+<pre>// T 键：模拟受击（从右侧来）
+if (Input.GetKeyDown(KeyCode.T))
+    PlayHitFeedback(transform.position + Vector3.right, 1f);
+
+// B 键：模拟冲击波
+if (Input.GetKeyDown(KeyCode.B))
+    PlayShockwave(transform.position);</pre>
+
+<p>运行游戏（按 Host 本地测试），按 T/B 看效果。调参满意后删掉这 4 行。</p>
+
+<hr>
+
+<!-- ============================================================ -->
+<h2>📊 效果用途速查</h2>
+
+<table>
+  <tr><th>时机</th><th>触发效果</th><th>信息传达</th></tr>
+  <tr><td>生成</td><td>SpawnBounce（弹性弹出）</td><td>"我入场了"</td></tr>
+  <tr><td>受击</td><td>CameraShake（抖屏）<br>DamageIndicator（方向弧）<br>SpriteFlash（闪白）<br>DamagePulse（缩抖）<br>ImpactLines（冲击线）</td><td>"我被打了！从哪边来的"</td></tr>
+  <tr><td>击杀</td><td>DeathBurst Particle（爆散粒子）<br>Shockwave（地面冲击波）</td><td>"我杀了一个人"（社交信号）</td></tr>
+  <tr><td>移动</td><td>MoveDust Particle（脚下尘烟）</td><td>"我正在移动"</td></tr>
+  <tr><td>拾取道具</td><td>PickupSparkle Particle（金色闪光）<br>Shockwave（可选，小范围）</td><td>"我拿了东西"</td></tr>
+  <tr><td>道具待拾取</td><td>ItemHover（浮动+旋转）</td><td>"来捡我"</td></tr>
+</table>
+
+<hr>
+
+<div style="text-align:center; color:#666; font-size:0.85rem; padding:24px 0;">
+  CIGA · 48h Game Jam · Generated with Claude Code
+</div>
+
+</body>
+</html>
