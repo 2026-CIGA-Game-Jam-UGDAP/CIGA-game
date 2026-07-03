@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>绳索宇航员 — GDD & 实现计划</title>
+<style>
+  :root {
+    --bg: #0a0a14;
+    --card: #12122a;
+    --border: #2a2a4a;
+    --text: #c8c8d8;
+    --accent: #6ec6f8;
+    --green: #4ec99e;
+    --yellow: #f0c050;
+    --red: #e05560;
+    --muted: #6a6a8a;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    line-height: 1.7;
+    max-width: 800px; margin: 0 auto; padding: 40px 24px;
+  }
+  h1 { font-size:2em; color:#fff; margin-bottom:4px; }
+  h1 small { font-size:.5em; color:var(--muted); display:block; margin-top:4px; }
+  h2 {
+    font-size:1.3em; color:var(--accent); margin:32px 0 12px;
+    padding-bottom:6px; border-bottom:2px solid var(--border);
+  }
+  h3 { font-size:1em; color:#fff; margin:16px 0 8px; }
+  p { margin:8px 0; }
+  .tag {
+    display:inline-block; padding:2px 10px; border-radius:10px;
+    font-size:.8em; font-weight:600; margin:2px;
+  }
+  .tag-ok { background:#1a3a2a; color:var(--green); }
+  .tag-warn { background:#3a2a0a; color:var(--yellow); }
+  .tag-skip { background:#1a1a2a; color:var(--muted); }
+  .card {
+    background:var(--card); border:1px solid var(--border);
+    border-radius:10px; padding:20px; margin:16px 0;
+  }
+  table { width:100%; border-collapse:collapse; margin:12px 0; }
+  th, td { padding:8px 12px; text-align:left; border-bottom:1px solid var(--border); }
+  th { color:var(--accent); font-weight:600; font-size:.85em; text-transform:uppercase; }
+  tr:last-child td { border-bottom:none; }
+  .step-badge {
+    display:inline-block; width:24px; height:24px; line-height:24px;
+    text-align:center; border-radius:50%; font-size:.75em; font-weight:700;
+    margin-right:8px;
+  }
+  .step-done { background:#1a3a2a; color:var(--green); }
+  .step-active { background:#3a2a0a; color:var(--yellow); }
+  .step-pending { background:#1a1a2a; color:var(--muted); }
+  ul { padding-left:20px; }
+  li { margin:4px 0; }
+  .checklist li { list-style:none; }
+  .checklist li::before { content:"☐ "; color:var(--muted); }
+  .highlight { color:var(--accent); font-weight:600; }
+  .risk { color:var(--yellow); }
+  hr { border:none; border-top:1px solid var(--border); margin:24px 0; }
+  code {
+    background:#1a1a30; padding:1px 6px; border-radius:4px;
+    font-size:.9em; color:var(--accent);
+  }
+  .one-liner {
+    font-size:1.1em; color:#fff; text-align:center;
+    padding:16px; background:var(--card); border-radius:8px;
+    margin:12px 0; border-left:3px solid var(--accent);
+  }
+</style>
+</head>
+<body>
+
+<h1>🧑‍🚀 绳索宇航员 <small>设计文档 &amp; 实现计划 · 48h Game Jam</small></h1>
+
+<div class="one-liner">
+  两个宇航员被 Obi 弹力绳拴在一起，在失重太空站外协同跳跃——从起点到终点。
+</div>
+
+<h2>一、设计决策</h2>
+<table>
+  <tr><th>决策项</th><th>选择</th><th>理由</th></tr>
+  <tr><td>绳索手感</td><td><span class="highlight">弹力绳</span>（3-5 单位）</td><td>拉远→蓄力→弹回，操作空间大</td></tr>
+  <tr><td>玩家操作</td><td>纯物理涌现</td><td>MVP 不加特殊技能</td></tr>
+  <tr><td>失败处理</td><td>秒重来</td><td>参考 Celeste，零试错成本</td></tr>
+  <tr><td>视觉风格</td><td>极简几何</td><td>2h 出全部美术</td></tr>
+  <tr><td>网络</td><td>去 Mirror</td><td>纯本地 WASD + 方向键</td></tr>
+  <tr><td>摄像机</td><td>中点跟随 + zoom</td><td>两人 + 绳始终在视野内</td></tr>
+</table>
+
+<h2>二、设计四柱验证</h2>
+<table>
+  <tr><th>柱子</th><th>判断</th><th>要点</th></tr>
+  <tr><td>低认知压力</td><td><span class="tag tag-ok">✅ 通过</span></td><td>看一眼就知道：俩人被绳拴着要跳过去</td></tr>
+  <tr><td>可迭代</td><td><span class="tag tag-ok">✅ 通过</span></td><td>核心闭环 = 宇航员 + 绳 + 平台，独立可玩</td></tr>
+  <tr><td>好玩</td><td><span class="tag tag-warn">⚠️ Obi 调参</span></td><td>弹力绳手感是唯一乐趣来源，暴露参数为 SO 实时调</td></tr>
+  <tr><td>循环性</td><td><span class="tag tag-skip">⏭️ 跳过</span></td><td>MVP 不追求 replay</td></tr>
+</table>
+
+<h2>三、文件结构</h2>
+<div class="card">
+<pre style="color:var(--text);">
+Assets/
+├── Scripts/
+│   ├── <span style="color:var(--green);">PlayerController.cs</span>   # 双人输入 + Rigidbody2D 惯性
+│   ├── <span style="color:var(--yellow);">RopeController.cs</span>     # Obi 绳索管理 + 参数热加载
+│   ├── <span style="color:var(--yellow);">RopeConfig.cs</span>         # 绳索参数 ScriptableObject
+│   ├── <span style="color:var(--yellow);">GameManager.cs</span>        # 游戏流程（过关/失败/重来）
+│   ├── <span style="color:var(--yellow);">CameraFollow.cs</span>       # 双人中点跟随 + 自适应 zoom
+│   └── <span style="color:var(--green);">SceneLoader.cs</span>         # 场景切换（已去 Mirror）
+├── _Archive/                   # 废弃 Mirror 文件
+├── ScriptableObjects/
+│   └── RopeConfig.asset
+├── Scenes/
+│   └── GamePlay.unity
+└── Resources/
+    └── Player.prefab
+</pre>
+</div>
+
+<h2>四、实现步骤</h2>
+<table>
+  <tr><th></th><th>步骤</th><th>内容</th><th>时间</th><th>状态</th></tr>
+  <tr>
+    <td><span class="step-badge step-done">1</span></td>
+    <td>切割 Mirror</td>
+    <td>PlayerController 去网络、废弃文件归档、SceneLoader 简化</td>
+    <td>5 min</td>
+    <td><span class="tag tag-ok">✅</span></td>
+  </tr>
+  <tr>
+    <td><span class="step-badge step-done">2</span></td>
+    <td>横版移动</td>
+    <td>双人输入 + Rigidbody2D 惯性 + 地面检测</td>
+    <td>30 min</td>
+    <td><span class="tag tag-ok">✅</span></td>
+  </tr>
+  <tr>
+    <td><span class="step-badge step-active">3</span></td>
+    <td>Obi 绳索</td>
+    <td>RopeController + RopeConfig SO + 两端绑定玩家</td>
+    <td>60 min</td>
+    <td><span class="tag tag-warn">🔧</span></td>
+  </tr>
+  <tr>
+    <td><span class="step-badge step-pending">4</span></td>
+    <td>摄像机</td>
+    <td>双人中点跟随 + 自适应 zoom</td>
+    <td>20 min</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><span class="step-badge step-pending">5</span></td>
+    <td>Game Loop</td>
+    <td>起点/终点/失败检测/秒重来</td>
+    <td>30 min</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><span class="step-badge step-pending">6</span></td>
+    <td>关卡搭建</td>
+    <td>3 关递增难度（平台 + 障碍）</td>
+    <td>60 min</td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><span class="step-badge step-pending">7</span></td>
+    <td>Juice</td>
+    <td>DoTween 过渡 + 星空 + 喷气粒子</td>
+    <td>30 min</td>
+    <td></td>
+  </tr>
+</table>
+
+<h2>五、时间估算</h2>
+<div class="card" style="text-align:center;">
+  <span style="font-size:3em;color:var(--accent);font-weight:700;">~4h</span>
+  <p style="color:var(--muted);">编码时间 · 余量 4h 用于 Obi 调参 + 打磨 + debug</p>
+</div>
+
+<h2>六、验证清单</h2>
+<ul class="checklist">
+  <li>P1 A/D/W — 惯性漂移 + 跳跃</li>
+  <li>P2 ←/→/↑ — 同上</li>
+  <li>两人拉开距离 — 绳索拉伸/弹回</li>
+  <li>一人跳下平台 — 绳拉住/弹回</li>
+  <li>两人掉出屏幕 — 秒重来</li>
+  <li>两人到终点 — 过关</li>
+</ul>
+
+<hr>
+<p style="text-align:center;color:var(--muted);font-size:.85em;">
+  🤖 Generated with Claude Code · 48h Game Jam · 2026-07-03
+</p>
+
+</body>
+</html>
