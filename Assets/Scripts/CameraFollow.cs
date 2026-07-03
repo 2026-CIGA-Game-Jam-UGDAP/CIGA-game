@@ -16,6 +16,9 @@ public class CameraFollow : MonoBehaviour
     [Tooltip("跟随平滑度。越大越跟得紧")]
     public float smoothSpeed = 5f;
 
+    [Tooltip("Zoom 变化平滑度。越小越慢越不容易晕")]
+    public float zoomSmoothSpeed = 1.5f;
+
     [Tooltip("最小 orthographic size（最近距离）")]
     public float minZoom = 4f;
     [Tooltip("最大 orthographic size（最远距离）")]
@@ -48,15 +51,15 @@ public class CameraFollow : MonoBehaviour
             smoothSpeed * Time.deltaTime
         );
 
-        // 自适应 zoom：水平距离越大，镜头越远
-        float dist = Mathf.Abs(player1.transform.position.x - player2.transform.position.x);
+        // 自适应 zoom：真实距离越大，镜头越远（慢速跟随不晕）
+        float dist = Vector2.Distance(player1.transform.position, player2.transform.position);
         float targetZoom = dist + zoomPadding;
         targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
 
         cam.orthographicSize = Mathf.Lerp(
             cam.orthographicSize,
             targetZoom,
-            smoothSpeed * Time.deltaTime
+            zoomSmoothSpeed * Time.deltaTime
         );
     }
 }

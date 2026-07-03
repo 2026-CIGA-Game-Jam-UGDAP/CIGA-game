@@ -40,6 +40,8 @@ public class PlayerController : MonoBehaviour
     public float jetForce = 5f;
     [Tooltip("最高移动速度限制")]
     public float maxSpeed = 8f;
+    [Tooltip("星球表面移动速度（沿表面切向）")]
+    public float moveSpeed = 3f;
     [Tooltip("惯性阻尼。越小越滑（太空漂浮感），0.05=明显漂浮，1=立刻停下")]
     public float linearDrag = 0.05f;
 
@@ -185,13 +187,15 @@ public class PlayerController : MonoBehaviour
             if (Mathf.Abs(rawHorizontal) > 0.01f)
             {
                 // D/→ = 顺时针增加 surfaceT，A/← = 逆时针减少 surfaceT
-                surfaceT += rawHorizontal * jetForce * Time.fixedDeltaTime;
+                surfaceT += rawHorizontal * moveSpeed * Time.fixedDeltaTime;
                 IsJetting = true;
             }
             else
             {
                 IsJetting = false;
             }
+
+            // ★ 碰碰车弹开：OnCollisionStay2D 里处理，这里不再检测距离
 
             Vector2 targetPos = anchoredAt.GetSurfacePoint(surfaceT);
 
@@ -226,8 +230,7 @@ public class PlayerController : MonoBehaviour
 
         IsJetting = jetting;
 
-        // 惯性限速（所有方向统一上限）
-        rb.velocity = Vector2.ClampMagnitude(rb.velocity, maxSpeed);
+        // ★ 不再硬限速：jetForce 决定每次推力，linearDrag 自然限速。调 jetForce 直观可感
     }
 
     // ---- 输入 (Module 2: 四方向喷气) ----
@@ -285,6 +288,17 @@ public class PlayerController : MonoBehaviour
 
     /// <summary>是否已被锚点吸附</summary>
     public bool IsAnchored => isAnchored;
+    /// <summary>当前吸附的锚点（null 表示未吸附）</summary>
+    public AnchorPoint CurrentAnchor => anchoredAt;
+    /// <summary>当前在表面上的位置 t 值</summary>
+    public float SurfaceT => surfaceT;
+
+    /// <summary>沿表面推开一段距离（碰碰车弹开用）</summary>
+    public void BumpOnSurface(float deltaT)
+    {
+        if (isAnchored)
+            surfaceT += deltaT;
+    }
 
     /// <summary>拾取零件或队友传输时调用</summary>
     public void AddEnergy(float amount)
@@ -296,6 +310,12 @@ public class PlayerController : MonoBehaviour
     {
         // ★ 目标：表面上最近点（圆/多边形统一用 GetClosestSurfacePoint）
         Vector3 target = anchor.GetClosestSurfacePoint(transform.position);
+
+        // ★ 提前算好目标法线角度，飞行中同步旋转
+        float startAngle = rb != null ? rb.rotation : transform.eulerAngles.z;
+        float targetT = anchor.FindClosestSurfaceT(target);
+        Vector2 targetNormal = anchor.GetSurfaceNormal(targetT);
+        float targetAngle = Mathf.Atan2(targetNormal.y, targetNormal.x) * Mathf.Rad2Deg - 90f;
 
         // ★ 飞行阶段：不处理物理，协程驱动位置
         isFlyingToAnchor = true;
@@ -313,6 +333,11 @@ public class PlayerController : MonoBehaviour
             Vector3 pos = Vector3.Lerp(startPos, target, eased);
             if (rb != null) rb.MovePosition(pos);
             else transform.position = pos;
+
+            // ★ 飞行中同步旋转到目标法线
+            float rot = Mathf.LerpAngle(startAngle, targetAngle, eased);
+            if (rb != null) rb.MoveRotation(rot);
+
             yield return null;
         }
 
@@ -338,6 +363,32 @@ public class PlayerController : MonoBehaviour
 
         isFlyingToAnchor = false;
         isAnchored = true;
+    }
+
+    // ---- 碰碰车弹开（碰撞体检测）----
+
+    void OnCollisionStay2D(Collision2D collision)
+    {
+        if (!isAnchored) return;
+
+        PlayerController other = collision.gameObject.GetComponent<PlayerController>();
+        if (other == null || !other.IsAnchored || other.CurrentAnchor != anchoredAt) return;
+
+        // 只让 instanceID 小的一方处理，避免双方重复弹
+        if (GetInstanceID() > other.GetInstanceID()) return;
+
+        Vector2 normal = anchoredAt.GetSurfaceNormal(surfaceT);
+        Vector2 toOther = (other.transform.position - transform.position).normalized;
+        Vector2 tangent = new Vector2(-normal.y, normal.x);
+        float dot = Vector2.Dot(toOther, tangent);
+        float sign = dot >= 0f ? 1f : -1f;
+        float push = 0.4f;
+        surfaceT -= sign * push;
+        other.BumpOnSurface(sign * push);
+
+        Debug.Log($"[Bumper] ★ 弹开！{name} ↔ {other.name}, push={push:F2}");
+        spriteFlash?.Flash();
+        cameraShake?.Shake(0.3f);
     }
 
     // ---- 外观 ----
