@@ -58,7 +58,9 @@ Category {
 				o.projPos = ComputeScreenPos (o.pos);
 				#ifdef SOFTPARTICLES_ON
 				//o.projPos = ComputeScreenPos (o.pos);
-				COMPUTE_EYEDEPTH(o.projPos.z);
+				// COMPUTE_EYEDEPTH broken in Unity 2022, manual:
+				float3 worldP = mul(unity_ObjectToWorld, float4(v.pos.xyz, 1.0)).xyz;
+				o.projPos.z = -mul(UNITY_MATRIX_V, float4(worldP, 1.0)).z;
 				#endif
 
 				o.color = v.color;

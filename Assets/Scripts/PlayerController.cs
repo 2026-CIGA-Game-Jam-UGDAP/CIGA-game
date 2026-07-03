@@ -22,9 +22,12 @@ public class PlayerController : MonoBehaviour
     [Header("能量")]
     [Tooltip("能量上限")]
     [SerializeField] float maxEnergy = 100f;
-    [Tooltip("喷气每秒消耗的能量")]
-    [SerializeField] float drainRate = 25f;
+    [Tooltip("每次喷气瞬时消耗的能量（按一下扣一次）")]
+    [SerializeField] float energyPerBurst = 15f;
     float currentEnergy;
+
+    // ★ 瞬时喷气：Update 捕获按下的方向，FixedUpdate 消费后清零
+    Vector2 pendingJetImpulse;
 
     /// <summary>能量百分比 0~1，给 UI Image fill 用</summary>
     public float EnergyPercent => maxEnergy > 0f ? currentEnergy / maxEnergy : 0f;
@@ -66,8 +69,7 @@ public class PlayerController : MonoBehaviour
     bool isAnchored;
     bool isFlyingToAnchor;
     AnchorPoint anchoredAt;
-    float anchorMoveRadius;
-    float surfaceAngle; // 玩家在星球表面的当前角度（弧度）
+    float surfaceT; // 玩家在表面上的当前距离（沿周长，圆和多边形统一）
 
     // ---- 生命周期 ----
 
@@ -114,6 +116,9 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        // ★ 瞬时喷气：在 Update 捕获 GetKeyDown，避免 FixedUpdate 丢帧
+        pendingJetImpulse = GetJetInputDown();
+
         if (otherPlayer == null) return;
 
         // ★ 能量传输：按住给队友传能量（对方满了就停）
@@ -152,20 +157,18 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        // ★ 星球表面移动：沿球表面切向移动，头朝外、脚朝球心
+        // ★ 星球表面移动：沿表面切向移动，头朝外、脚朝球心（圆/多边形统一）
         if (isAnchored)
         {
             Vector2 jetInput = GetJetInput();
 
-            // 仅左右输入有效：左=逆时针，右=顺时针
             float moveDir = 0f;
             if (jetInput.x > 0.01f) moveDir = -1f;
             else if (jetInput.x < -0.01f) moveDir = 1f;
 
             if (Mathf.Abs(moveDir) > 0.01f)
             {
-                float angularSpeed = jetForce / anchorMoveRadius;
-                surfaceAngle += moveDir * angularSpeed * Time.fixedDeltaTime;
+                surfaceT += moveDir * jetForce * Time.fixedDeltaTime;
                 IsJetting = true;
             }
             else
@@ -173,33 +176,31 @@ public class PlayerController : MonoBehaviour
                 IsJetting = false;
             }
 
-            // 固定在球表面
-            Vector2 center = anchoredAt.transform.position;
-            Vector2 outward = new Vector2(Mathf.Cos(surfaceAngle), Mathf.Sin(surfaceAngle));
-            Vector2 targetPos = center + outward * anchorMoveRadius;
+            Vector2 targetPos = anchoredAt.GetSurfacePoint(surfaceT);
+            Vector2 normal = anchoredAt.GetSurfaceNormal(surfaceT);
 
             rb.MovePosition(targetPos);
             rb.velocity = Vector2.zero;
             rb.angularVelocity = 0f;
 
-            // ★ 旋转：头朝外（远离球心），脚朝球心。用 MoveRotation 丝滑
-            float targetAngle = Mathf.Atan2(outward.y, outward.x) * Mathf.Rad2Deg - 90f;
+            float targetAngle = Mathf.Atan2(normal.y, normal.x) * Mathf.Rad2Deg - 90f;
             rb.MoveRotation(targetAngle);
 
             return;
         }
 
-        Vector2 input = GetJetInput();
+        // ★ 自由飞行：瞬时喷气（按一下 = 一次冲量，不按住持续施力）
+        Vector2 input = pendingJetImpulse;
+        pendingJetImpulse = Vector2.zero;
 
-        bool jetting = input.sqrMagnitude > 0.01f && currentEnergy > 0f;
+        bool jetting = input.sqrMagnitude > 0.01f && currentEnergy >= energyPerBurst;
 
         if (jetting)
         {
-            float drain = drainRate * Time.fixedDeltaTime;
-            currentEnergy -= drain;
+            currentEnergy -= energyPerBurst;
             if (currentEnergy < 0f) currentEnergy = 0f;
 
-            rb.AddForce(input.normalized * jetForce, ForceMode2D.Force);
+            rb.AddForce(input.normalized * jetForce, ForceMode2D.Impulse);
         }
 
         IsJetting = jetting;
@@ -212,24 +213,53 @@ public class PlayerController : MonoBehaviour
 
     Vector2 GetJetInput()
     {
-        Vector2 v = Vector2.zero;
+        Vector2 raw = Vector2.zero;
 
         if (playerIndex == 0)
         {
-            if (Input.GetKey(KeyCode.W)) v.y += 1;
-            // ★ 喷气背包无法向下移动
-            if (Input.GetKey(KeyCode.A)) v.x -= 1;
-            if (Input.GetKey(KeyCode.D)) v.x += 1;
+            if (Input.GetKey(KeyCode.W)) raw.y += 1;
+            if (Input.GetKey(KeyCode.A)) raw.x -= 1;
+            if (Input.GetKey(KeyCode.D)) raw.x += 1;
         }
         else
         {
-            if (Input.GetKey(KeyCode.UpArrow))    v.y += 1;
-            // ★ 喷气背包无法向下移动
-            if (Input.GetKey(KeyCode.LeftArrow))  v.x -= 1;
-            if (Input.GetKey(KeyCode.RightArrow)) v.x += 1;
+            if (Input.GetKey(KeyCode.UpArrow))    raw.y += 1;
+            if (Input.GetKey(KeyCode.LeftArrow))  raw.x -= 1;
+            if (Input.GetKey(KeyCode.RightArrow)) raw.x += 1;
         }
 
-        return v;
+        return RawToWorldDir(raw);
+    }
+
+    /// <summary>瞬时喷气输入：按下那一帧才返回方向（星球表面不用这个）</summary>
+    Vector2 GetJetInputDown()
+    {
+        Vector2 raw = Vector2.zero;
+
+        if (playerIndex == 0)
+        {
+            if (Input.GetKeyDown(KeyCode.W)) raw.y += 1;
+            if (Input.GetKeyDown(KeyCode.A)) raw.x -= 1;
+            if (Input.GetKeyDown(KeyCode.D)) raw.x += 1;
+        }
+        else
+        {
+            if (Input.GetKeyDown(KeyCode.UpArrow))    raw.y += 1;
+            if (Input.GetKeyDown(KeyCode.LeftArrow))  raw.x -= 1;
+            if (Input.GetKeyDown(KeyCode.RightArrow)) raw.x += 1;
+        }
+
+        return RawToWorldDir(raw);
+    }
+
+    /// <summary>把原始输入转为玩家朝向的世界方向：W=朝脸方向(up), A/D=左右</summary>
+    Vector2 RawToWorldDir(Vector2 raw)
+    {
+        Vector2 world = Vector2.zero;
+        if (raw.y > 0.01f) world += (Vector2)transform.up;
+        if (raw.x > 0.01f) world += (Vector2)transform.right;
+        if (raw.x < -0.01f) world -= (Vector2)transform.right;
+        return world;
     }
 
     // ---- Module 4: 锚点吸附（切换行为）----
@@ -263,15 +293,8 @@ public class PlayerController : MonoBehaviour
 
     System.Collections.IEnumerator AttachRoutine(AnchorPoint anchor, float speed)
     {
-        float radius = anchor.moveRadius;
-
-        // ★ 目标：球表面最近点（而非球心），避免到达后瞬移
-        Vector3 toPlayer = transform.position - anchor.transform.position;
-        Vector3 target;
-        if (toPlayer.magnitude > 0.001f)
-            target = anchor.transform.position + toPlayer.normalized * radius;
-        else
-            target = anchor.transform.position + Vector3.right * radius;
+        // ★ 目标：表面上最近点（圆/多边形统一用 GetClosestSurfacePoint）
+        Vector3 target = anchor.GetClosestSurfacePoint(transform.position);
 
         // ★ 飞行阶段：不处理物理，协程驱动位置
         isFlyingToAnchor = true;
@@ -292,17 +315,15 @@ public class PlayerController : MonoBehaviour
             yield return null;
         }
 
-        // ★ 到达后进入星球表面移动模式
+        // ★ 到达后进入表面移动模式
         if (rb != null) rb.MovePosition(target);
         else transform.position = target;
         if (rb != null) rb.velocity = Vector2.zero;
 
         anchoredAt = anchor;
-        anchorMoveRadius = radius;
 
-        // ★ 初始化表面角度：根据玩家在球表面的位置计算
-        Vector3 dirFromCenter = transform.position - anchor.transform.position;
-        surfaceAngle = Mathf.Atan2(dirFromCenter.y, dirFromCenter.x);
+        // ★ 初始化 surfaceT：根据到达位置在表面上的距离
+        surfaceT = anchor.FindClosestSurfaceT(transform.position);
 
         // ★ 不锁 Z 轴：允许玩家随表面旋转自由翻转
         if (rb != null)

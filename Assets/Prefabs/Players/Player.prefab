@@ -182,7 +182,7 @@ MonoBehaviour:
   jetForce: 8
   maxSpeed: 60
   linearDrag: 1.5
-  maxEnergy: 100
+  maxEnergy: 1000
   drainRate: 25
   otherPlayer: {fileID: 0}
   transferRate: 30
