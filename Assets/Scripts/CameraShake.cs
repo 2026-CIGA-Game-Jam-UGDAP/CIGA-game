@@ -10,6 +10,7 @@ using UnityEngine;
 public class CameraShake : MonoBehaviour
 {
     [Header("抖动参数")]
+    [Tooltip("Cinemachine Impulse Source 组件引用")]
     [SerializeField] CinemachineImpulseSource impulseSource;
 
     [Tooltip("默认抖动强度（Shake() 无参数时使用）")]

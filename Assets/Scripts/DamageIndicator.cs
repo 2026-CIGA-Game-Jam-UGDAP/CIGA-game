@@ -13,8 +13,11 @@ public class DamageIndicator : MonoBehaviour
     [SerializeField] Image arcImage;
 
     [Header("动画参数")]
+    [Tooltip("指示器显示持续时间（秒）")]
     [SerializeField] float showDuration = 0.5f;
+    [Tooltip("淡出持续时间（秒）")]
     [SerializeField] float fadeDuration = 0.3f;
+    [Tooltip("指示器最大透明度（0~1）")]
     [SerializeField] float maxAlpha = 0.7f;
 
     Camera mainCam;

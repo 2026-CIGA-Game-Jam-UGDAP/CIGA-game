@@ -9,17 +9,23 @@ using System.Collections.Generic;
 public class AnchorPoint : MonoBehaviour
 {
     [Header("吸附参数")]
+    [Tooltip("飞向锚点的移动速度")]
     [SerializeField] float snapSpeed = 12f;
     [Tooltip("吸附后玩家可移动半径。0=自动读取 CircleCollider2D.radius")]
     public float moveRadius = 0f;
 
     [Header("按键")]
+    [Tooltip("P1 (WASD 玩家) 吸附/脱离按键")]
     [SerializeField] KeyCode p1SnapKey = KeyCode.F;
+    [Tooltip("P2 (方向键玩家) 吸附/脱离按键")]
     [SerializeField] KeyCode p2SnapKey = KeyCode.RightShift;
 
     [Header("视觉提示（可选）")]
+    [Tooltip("锚点指示器 SpriteRenderer，显示锚点状态颜色")]
     [SerializeField] SpriteRenderer indicator;
+    [Tooltip("锚点空闲时的颜色")]
     [SerializeField] Color freeColor = Color.white;
+    [Tooltip("锚点被占用时的颜色")]
     [SerializeField] Color occupiedColor = Color.green;
 
     List<PlayerController> playersInRange = new List<PlayerController>();

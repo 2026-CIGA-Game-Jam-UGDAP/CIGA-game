@@ -11,9 +11,11 @@ public class Pickup : MonoBehaviour
     public enum Type { Goal, Energy }
 
     [Header("类型")]
+    [Tooltip("Goal=通关零件（收集齐过关），Energy=能量补给（靠近自动拾取）")]
     public Type pickupType = Type.Energy;
 
     [Header("能量恢复量（仅 Energy 类型有效）")]
+    [Tooltip("拾取后恢复的能量值")]
     public float energyAmount = 30f;
 
     void OnTriggerEnter2D(Collider2D other)

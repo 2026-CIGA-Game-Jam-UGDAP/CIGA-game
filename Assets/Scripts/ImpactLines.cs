@@ -9,12 +9,17 @@ using UnityEngine.UI;
 public class ImpactLines : MonoBehaviour
 {
     [Header("冲击线 Image")]
+    [Tooltip("冲击线 UI Image 组件引用（Screen Space Overlay Canvas 下）")]
     [SerializeField] Image impactImage;
 
     [Header("动画参数")]
+    [Tooltip("缩放弹入阶段持续时间（秒）")]
     [SerializeField] float scaleInDuration = 0.08f;
+    [Tooltip("保持阶段持续时间（秒）")]
     [SerializeField] float holdDuration = 0.12f;
+    [Tooltip("淡出阶段持续时间（秒）")]
     [SerializeField] float fadeDuration = 0.1f;
+    [Tooltip("缩放弹入曲线：横轴=时间(0~1)，纵轴=缩放倍率")]
     [SerializeField] AnimationCurve scaleInCurve = new AnimationCurve(
         new Keyframe(0f, 0f),
         new Keyframe(0.5f, 1.1f),

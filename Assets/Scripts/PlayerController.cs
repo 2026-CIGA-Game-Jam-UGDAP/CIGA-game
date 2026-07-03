@@ -8,17 +8,22 @@ using UnityEngine;
 public class PlayerController : MonoBehaviour
 {
     [Header("玩家索引")]
-    public int playerIndex = 0; // 0 = WASD, 1 = 方向键
+    [Tooltip("0 = P1 (WASD), 1 = P2 (方向键)")]
+    public int playerIndex = 0;
 
     [Header("移动")]
+    [Tooltip("喷气推力大小，值越大加速越快")]
     public float jetForce = 5f;
+    [Tooltip("最高移动速度限制")]
     public float maxSpeed = 8f;
-    [Tooltip("惯性阻尼。越小越滑（太空感），0.05=明显漂浮")]
+    [Tooltip("惯性阻尼。越小越滑（太空漂浮感），0.05=明显漂浮，1=立刻停下")]
     public float linearDrag = 0.05f;
 
     [Header("能量")]
+    [Tooltip("能量上限")]
     [SerializeField] float maxEnergy = 100f;
-    [SerializeField] float drainRate = 25f;      // 每秒消耗
+    [Tooltip("喷气每秒消耗的能量")]
+    [SerializeField] float drainRate = 25f;
     float currentEnergy;
 
     /// <summary>能量百分比 0~1，给 UI Image fill 用</summary>
@@ -32,18 +37,27 @@ public class PlayerController : MonoBehaviour
     public bool IsJetting { get; private set; }
 
     [Header("队友交互")]
+    [Tooltip("拖入另一个玩家的 PlayerController 引用")]
     public PlayerController otherPlayer;
-    [SerializeField] float transferRate = 30f;   // 每秒传输能量
-    [SerializeField] float pullForce = 4f;       // 拉队友的力
+    [Tooltip("按住传输键时每秒传给队友的能量")]
+    [SerializeField] float transferRate = 30f;
+    [Tooltip("拉队友时施加的力，越大拉得越猛")]
+    [SerializeField] float pullForce = 4f;
     KeyCode transferKey;
     KeyCode pullKey;
 
     [Header("TA 效果")]
+    [Tooltip("摄像机抖动组件引用")]
     [SerializeField] CameraShake cameraShake;
+    [Tooltip("Sprite 闪白组件引用")]
     [SerializeField] SpriteFlash spriteFlash;
+    [Tooltip("受击缩抖组件引用")]
     [SerializeField] DamagePulse damagePulse;
+    [Tooltip("冲击线 UI 组件引用")]
     [SerializeField] ImpactLines impactLines;
+    [Tooltip("出生弹性动画组件引用")]
     [SerializeField] SpawnBounce spawnBounce;
+    [Tooltip("冲击波预制体（运行时 Instantiate）")]
     [SerializeField] GameObject shockwavePrefab;
 
     Rigidbody2D rb;

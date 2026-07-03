@@ -8,8 +8,11 @@ using UnityEngine;
 public class SpriteFlash : MonoBehaviour
 {
     [Header("闪白参数")]
+    [Tooltip("闪烁时覆盖的颜色（默认白色）")]
     [SerializeField] Color flashColor = Color.white;
+    [Tooltip("单次闪烁的持续时间（秒）")]
     [SerializeField] float flashDuration = 0.1f;
+    [Tooltip("闪烁次数")]
     [SerializeField] int flashCount = 1;
 
     Renderer rend;

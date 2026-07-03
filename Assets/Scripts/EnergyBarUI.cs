@@ -6,6 +6,7 @@ using UnityEngine.UI;
 /// </summary>
 public class EnergyBarUI : MonoBehaviour
 {
+    [Tooltip("要显示能量的玩家")]
     public PlayerController player;
     Image fill;
 

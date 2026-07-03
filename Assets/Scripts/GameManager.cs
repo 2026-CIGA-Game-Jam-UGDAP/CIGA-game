@@ -11,18 +11,23 @@ using Obi;
 public class GameManager : MonoBehaviour
 {
     [Header("玩家")]
+    [Tooltip("玩家 1 的 PlayerController 引用")]
     public PlayerController player1;
+    [Tooltip("玩家 2 的 PlayerController 引用")]
     public PlayerController player2;
 
     [Header("生成点")]
+    [Tooltip("玩家 1 的出生/重生位置")]
     public Transform spawnPoint1;
+    [Tooltip("玩家 2 的出生/重生位置")]
     public Transform spawnPoint2;
 
     [Header("绳索")]
+    [Tooltip("绳索控制器引用")]
     public RopeController ropeController;
 
     [Header("失败条件")]
-    [Tooltip("玩家掉到这个 Y 值以下即死亡")]
+    [Tooltip("玩家掉到这个 Y 值以下即死亡重来")]
     public float deathY = -10f;
 
     [Header("通关零件")]
@@ -31,7 +36,9 @@ public class GameManager : MonoBehaviour
     int collectedGoals;
 
     [Header("重来效果")]
-    public Image fadeImage;          // 全屏黑色 Image（DoTween 控制 alpha）
+    [Tooltip("全屏黑色遮罩 Image（用于淡入淡出）")]
+    public Image fadeImage;
+    [Tooltip("黑屏淡入淡出的持续时间（秒）")]
     public float fadeDuration = 0.3f;
 
     bool p1AtGoal;

@@ -7,15 +7,18 @@ using UnityEngine;
 public class CameraFollow : MonoBehaviour
 {
     [Header("目标")]
+    [Tooltip("玩家 1 的 PlayerController")]
     public PlayerController player1;
+    [Tooltip("玩家 2 的 PlayerController")]
     public PlayerController player2;
 
     [Header("参数")]
     [Tooltip("跟随平滑度。越大越跟得紧")]
     public float smoothSpeed = 5f;
 
-    [Tooltip("最小/最大 orthographic size")]
+    [Tooltip("最小 orthographic size（最近距离）")]
     public float minZoom = 4f;
+    [Tooltip("最大 orthographic size（最远距离）")]
     public float maxZoom = 12f;
 
     [Tooltip("额外边距，防止玩家贴边")]

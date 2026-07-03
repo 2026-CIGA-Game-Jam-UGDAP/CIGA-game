@@ -8,6 +8,7 @@ using UnityEngine;
 public class DamagePulse : MonoBehaviour
 {
     [Header("脉冲参数")]
+    [Tooltip("缩放曲线：横轴=时间(0~1)，纵轴=缩放倍率。默认先胀大再缩回")]
     [SerializeField] AnimationCurve pulseCurve = new AnimationCurve(
         new Keyframe(0f, 1f),
         new Keyframe(0.1f, 1.25f),
@@ -15,6 +16,7 @@ public class DamagePulse : MonoBehaviour
         new Keyframe(0.3f, 1.05f),
         new Keyframe(0.4f, 1f)
     );
+    [Tooltip("脉冲总持续时间（秒）")]
     [SerializeField] float duration = 0.4f;
 
     float timer = -1f;

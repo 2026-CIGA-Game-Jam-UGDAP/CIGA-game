@@ -7,12 +7,16 @@ using UnityEngine;
 public class ItemHover : MonoBehaviour
 {
     [Header("浮动参数")]
+    [Tooltip("浮动幅度（上下最远距离）")]
     [SerializeField] float floatAmplitude = 0.3f;
+    [Tooltip("浮动频率（每秒周期数）")]
     [SerializeField] float floatFrequency = 2f;
 
     [Header("旋转参数")]
+    [Tooltip("自转速度（度/秒）")]
     [SerializeField] float rotateSpeed = 90f;
-    [SerializeField] bool rotateOnZ = true;  // 俯视角旋转 Z 轴 = 水平旋转
+    [Tooltip("勾选=绕 Z 轴旋转（俯视角水平转），取消=绕 Y 轴旋转")]
+    [SerializeField] bool rotateOnZ = true;
 
     Vector3 startPos;
 

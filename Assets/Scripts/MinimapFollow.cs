@@ -7,7 +7,9 @@ using UnityEngine;
 public class MinimapFollow : MonoBehaviour
 {
     [Header("目标")]
+    [Tooltip("玩家 1 的 PlayerController")]
     public PlayerController player1;
+    [Tooltip("玩家 2 的 PlayerController")]
     public PlayerController player2;
 
     Camera cam;

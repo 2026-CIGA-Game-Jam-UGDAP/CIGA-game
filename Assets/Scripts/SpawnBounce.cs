@@ -7,12 +7,14 @@ using UnityEngine;
 public class SpawnBounce : MonoBehaviour
 {
     [Header("弹性参数")]
+    [Tooltip("弹性曲线：横轴=时间(0~1)，纵轴=缩放倍率。默认 overshoot 后回弹")]
     [SerializeField] AnimationCurve bounceCurve = new AnimationCurve(
         new Keyframe(0f, 0f),
         new Keyframe(0.4f, 1.15f),
         new Keyframe(0.7f, 0.95f),
         new Keyframe(1f, 1f)
     );
+    [Tooltip("弹性动画总持续时间（秒）")]
     [SerializeField] float duration = 0.6f;
 
     float timer = -1f;

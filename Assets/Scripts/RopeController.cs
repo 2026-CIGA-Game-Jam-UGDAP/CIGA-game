@@ -13,20 +13,27 @@ using Obi;
 public class RopeController : MonoBehaviour
 {
     [Header("组件引用")]
+    [Tooltip("场景中的 ObiRope 组件")]
     public ObiRope rope;
+    [Tooltip("场景中的 ObiSolver 组件")]
     public ObiSolver solver;
+    [Tooltip("场景中的 ObiRopeCursor 组件")]
     public ObiRopeCursor cursor;
 
     [Header("玩家（需要有 ObiCollider 组件）")]
+    [Tooltip("玩家 1 的 ObiCollider（ObiCollider 或 ObiCollider2D）")]
     public ObiColliderBase player1Collider;
+    [Tooltip("玩家 2 的 ObiCollider（ObiCollider 或 ObiCollider2D）")]
     public ObiColliderBase player2Collider;
     [Tooltip("Pin 约束偏移。调 Y 值把绳从脚底提到角色中心")]
     public Vector3 pinOffset = Vector3.zero;
 
     [Header("配置")]
+    [Tooltip("绳索物理参数配置（RopeConfig 资产）")]
     public RopeConfig config;
 
     [Header("事件")]
+    [Tooltip("GameManager 引用，断裂时回调 OnRopeBreak()")]
     public GameManager gameManager;
 
     // 调参脏标记：避免每帧 ChangeLength（增删粒子是重操作）

@@ -8,9 +8,13 @@ using UnityEngine;
 public class Shockwave : MonoBehaviour
 {
     [Header("扩散参数")]
+    [Tooltip("起始半径")]
     [SerializeField] float startRadius = 0.2f;
+    [Tooltip("最大扩散半径")]
     [SerializeField] float targetRadius = 5f;
+    [Tooltip("扩散阶段持续时间（秒）")]
     [SerializeField] float expandDuration = 0.4f;
+    [Tooltip("淡出阶段持续时间（秒）")]
     [SerializeField] float fadeDuration = 0.3f;
 
     SpriteRenderer sr;
