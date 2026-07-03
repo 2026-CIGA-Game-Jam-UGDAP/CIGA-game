@@ -17,13 +17,13 @@ public class RopeConfig : ScriptableObject
     public float thickness = 0.05f;
 
     [Header("弹性")]
-    [Tooltip("拉伸刚度。越小越弹（0.1=超弹橡皮筋，1=刚性棍子）")]
+    [Tooltip("拉伸刚度。越小越弹（0.1=超弹橡皮筋，1=刚性太空缆）")]
     [Range(0.01f, 1f)]
-    public float stretchStiffness = 0.3f;
+    public float stretchStiffness = 1f;
 
-    [Tooltip("弯曲刚度。越小越软，绳子越容易打弯")]
+    [Tooltip("弯曲刚度。越小越软越容易下坠，1=太空绷直线")]
     [Range(0.01f, 1f)]
-    public float bendingStiffness = 0.1f;
+    public float bendingStiffness = 1f;
 
     [Header("断裂")]
     [Tooltip("断裂阈值。力超过此值绳子会断。设 999 则永不断")]

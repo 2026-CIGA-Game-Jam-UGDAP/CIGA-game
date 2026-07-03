@@ -117,7 +117,7 @@ public class PlayerController : MonoBehaviour
         if (Input.GetKey(pullKey) && otherRb != null)
         {
             float dist = Vector3.Distance(transform.position, otherPlayer.transform.position);
-            if (dist > 2.2f) // 最小距离，防止重叠
+            if (dist > 2.6f) // 最小距离，防止重叠
             {
                 Vector3 dir = (transform.position - otherPlayer.transform.position).normalized;
                 otherRb.AddForce(dir * pullForce, ForceMode2D.Force);

@@ -67,6 +67,19 @@ public class RopeController : MonoBehaviour
             Debug.Log("[RopeController] 绳索初始化完成，粒子数: " + rope.UsedParticles);
         }
 
+        // ★ 太空环境：零重力 + 高刚度 = 绳子不弯不坠，像一根绷紧的太空缆
+        if (solver != null)
+        {
+            solver.parameters.gravity = Vector4.zero;
+            solver.UpdateParameters(); // ← 关键：推到 Obi 原生库，否则改 struct 不生效
+            Debug.Log("[RopeController] Obi solver 重力已归零");
+        }
+
+        // 太空零重力 → 绳子不该有任何弯曲/下坠，刚度拉满让它始终笔直
+        rope.BendingConstraints.stiffness = 1f;
+        rope.DistanceConstraints.stiffness = 1f;
+        Debug.Log("[RopeController] 绳索弯曲/拉伸刚度已设为 1.0（太空绷直线）");
+
         // === Pin 约束：粒子 0 → P1，粒子 N → P2 ===
         SetupPins();
 
@@ -89,6 +102,13 @@ public class RopeController : MonoBehaviour
     {
         if (rope == null || !rope.Initialized) return;
         if (pinsSetup) return;
+
+        // ★ 把玩家 ObiCollider2D 的碰撞源换成微型 CircleCollider2D
+        // 原来的 CapsuleCollider2D 形状太大 → 绳索粒子碰撞后绕圈
+        // 换成 r=0.01 的圆形后，Obi 碰撞形状极小，绳索无法"绕"住玩家身体
+        // Unity 物理碰撞（CapsuleCollider2D 之间）不受影响
+        SwapToTinyCollider(player1Collider);
+        SwapToTinyCollider(player2Collider);
 
         // 获取 Pin 约束批次（Initialize 里已创建了一个空 batch）
         ObiPinConstraintBatch batch = (ObiPinConstraintBatch)rope.PinConstraints.GetFirstBatch();
@@ -122,6 +142,34 @@ public class RopeController : MonoBehaviour
         }
 
         pinsSetup = true;
+    }
+
+    /// <summary>
+    /// 把 ObiCollider2D 的 source collider 从大的 CapsuleCollider2D 换成微型 CircleCollider2D。
+    /// 只影响 Obi 碰撞形状，不影响 Unity 物理。
+    /// </summary>
+    void SwapToTinyCollider(ObiColliderBase obiCol)
+    {
+        if (obiCol == null) return;
+
+        ObiCollider2D col2D = obiCol as ObiCollider2D;
+        if (col2D == null) return;
+
+        // 检查是否已经换过（避免重复创建）
+        CircleCollider2D existing = col2D.SourceCollider as CircleCollider2D;
+        if (existing != null && existing.radius < 0.1f) return; // 已经是微型的
+
+        // 在玩家 GameObject 上加一个微型 CircleCollider2D（只给 Obi 做碰撞形状用）
+        CircleCollider2D tiny = col2D.gameObject.AddComponent<CircleCollider2D>();
+        tiny.radius = 0.01f;
+
+        // ★ 关键：把 ObiCollider2D 的 source 换成微型碰撞体
+        // SourceCollider setter 内部会 Recreate 原生碰撞体（RemoveCollider + AddCollider）
+        col2D.SourceCollider = tiny;
+        col2D.Phase = 2;
+        col2D.Thickness = 0f;
+
+        Debug.Log($"[RopeController] {obiCol.name} Obi 碰撞形状已换成微型 (r=0.01)");
     }
 
     void Update()

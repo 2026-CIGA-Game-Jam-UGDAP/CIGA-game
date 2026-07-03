@@ -10,8 +10,8 @@ public class AnchorPoint : MonoBehaviour
 {
     [Header("吸附参数")]
     [SerializeField] float snapSpeed = 12f;
-    [Tooltip("吸附后玩家可在这个半径内移动，不受能量消耗")]
-    public float moveRadius = 5f;
+    [Tooltip("吸附后玩家可移动半径。0=自动读取 CircleCollider2D.radius")]
+    public float moveRadius = 0f;
 
     [Header("按键")]
     [SerializeField] KeyCode p1SnapKey = KeyCode.F;
@@ -24,6 +24,16 @@ public class AnchorPoint : MonoBehaviour
 
     List<PlayerController> playersInRange = new List<PlayerController>();
     PlayerController anchoredPlayer;
+
+    void Awake()
+    {
+        // 没手动设 moveRadius → 自动读 CircleCollider2D.radius
+        if (moveRadius <= 0f)
+        {
+            var col = GetComponent<CircleCollider2D>();
+            if (col != null) moveRadius = col.radius * Mathf.Max(transform.localScale.x, transform.localScale.y);
+        }
+    }
 
     void Start()
     {
