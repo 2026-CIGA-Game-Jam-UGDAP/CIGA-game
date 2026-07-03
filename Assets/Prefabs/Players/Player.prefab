@@ -114,7 +114,7 @@ Rigidbody2D:
   m_ExcludeLayers:
     serializedVersion: 2
     m_Bits: 0
-  m_Interpolate: 1
+  m_Interpolate: 2
   m_SleepingMode: 1
   m_CollisionDetection: 1
   m_Constraints: 0
@@ -179,14 +179,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerIndex: 0
-  jetForce: 8
+  jetForce: 2
   maxSpeed: 60
   linearDrag: 1.5
   maxEnergy: 1000
-  drainRate: 25
+  energyPerBurst: 15
   otherPlayer: {fileID: 0}
   transferRate: 30
-  pullForce: 4
   cameraShake: {fileID: 0}
   spriteFlash: {fileID: 0}
   damagePulse: {fileID: 0}

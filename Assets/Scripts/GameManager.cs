@@ -94,11 +94,12 @@ public class GameManager : MonoBehaviour
             Victory();
     }
 
-    /// <summary>绳索断裂时 Obi 调用</summary>
+    /// <summary>绳索断裂时 Obi 调用 — 暂时禁用重开</summary>
     public void OnRopeBreak()
     {
-        if (!resetting)
-            ResetLevel();
+        // ★ 暂时禁用重开逻辑
+        // if (!resetting)
+        //     ResetLevel();
     }
 
     void ResetLevel()

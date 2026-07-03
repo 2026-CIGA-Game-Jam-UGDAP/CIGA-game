@@ -28,6 +28,12 @@ public class RopeController : MonoBehaviour
     [Tooltip("Pin 约束偏移。调 Y 值把绳从脚底提到角色中心")]
     public Vector3 pinOffset = Vector3.zero;
 
+    [Header("玩家控制器")]
+    [Tooltip("玩家 1 的 PlayerController，用于读 IsPulling")]
+    public PlayerController player1Ctrl;
+    [Tooltip("玩家 2 的 PlayerController，用于读 IsPulling")]
+    public PlayerController player2Ctrl;
+
     [Header("配置")]
     [Tooltip("绳索物理参数配置（RopeConfig 资产）")]
     public RopeConfig config;
@@ -36,8 +42,11 @@ public class RopeController : MonoBehaviour
     [Tooltip("GameManager 引用，断裂时回调 OnRopeBreak()")]
     public GameManager gameManager;
 
+    // 运行时动态绳长
+    float currentRopeLength;
+    float lastCursorLength;
+
     // 调参脏标记：避免每帧 ChangeLength（增删粒子是重操作）
-    float lastAppliedLength = -1f;
     float lastAppliedStretchStiffness = -1f;
     float lastAppliedBendingStiffness = -1f;
     float lastAppliedTearResistance = -1f;
@@ -94,10 +103,13 @@ public class RopeController : MonoBehaviour
         rb1 = player1Collider != null ? player1Collider.GetComponent<Rigidbody2D>() : null;
         rb2 = player2Collider != null ? player2Collider.GetComponent<Rigidbody2D>() : null;
 
+        // 初始化动态绳长：取初始绳长
+        currentRopeLength = config != null ? config.initialRopeLength : 5f;
+        lastCursorLength = currentRopeLength;
+
         lastUsedParticles = rope.UsedParticles;
 
         // 强制触发首次参数应用
-        lastAppliedLength          = -1f;
         lastAppliedStretchStiffness = -1f;
         lastAppliedBendingStiffness = -1f;
         lastAppliedTearResistance  = -1f;
@@ -194,13 +206,57 @@ public class RopeController : MonoBehaviour
             lastUsedParticles = rope.UsedParticles;
         }
 
-        // 2. Play Mode 实时调参（只有值变化时才 apply）
+        // 2. 动态绳长：收绳 + 放绳
+        UpdateRopeLength();
+
+        // 3. Play Mode 实时调参（只有值变化时才 apply）
         ApplyConfigIfChanged();
     }
 
     /// <summary>
-    /// 弹簧拉力：Pin 约束是单向的（粒子跟玩家走），绳子张力不会自动回传到玩家。
-    /// 这里做一个简化弹簧——玩家间距超过绳长时，互相拉回。
+    /// 动态绳长：收绳（按住Q收短）+ 放绳（玩家走远自动伸长）。
+    /// </summary>
+    void UpdateRopeLength()
+    {
+        if (config == null) return;
+        float maxLen = config.ropeLength;
+        float minLen = config.minRopeLength;
+
+        // 统计谁在收绳
+        int pullers = 0;
+        if (player1Ctrl != null && player1Ctrl.IsPulling) pullers++;
+        if (player2Ctrl != null && player2Ctrl.IsPulling) pullers++;
+
+        if (pullers > 0)
+        {
+            // 收绳：减少绳长
+            currentRopeLength -= config.retractionSpeed * pullers * Time.deltaTime;
+            if (currentRopeLength < minLen) currentRopeLength = minLen;
+        }
+        else
+        {
+            // 放绳：玩家间距 > 当前绳长 → 自动伸长（瞬间，上限 maxLen）
+            if (rb1 != null && rb2 != null)
+            {
+                float dist = Vector3.Distance(rb1.transform.position, rb2.transform.position);
+                if (dist > currentRopeLength)
+                {
+                    currentRopeLength = Mathf.Min(dist, maxLen);
+                }
+            }
+        }
+
+        // 同步到 Obi rope cursor（只在变化足够大时才操作，增删粒子是重操作）
+        if (cursor != null && Mathf.Abs(currentRopeLength - lastCursorLength) > 0.1f)
+        {
+            cursor.ChangeLength(currentRopeLength);
+            lastCursorLength = currentRopeLength;
+        }
+    }
+
+    /// <summary>
+    /// 弹簧拉力：玩家间距超过当前绳长时拉回。
+    /// 单人收绳 → 单向拖拽（只拉被收的人）；无人收/双人收 → 双向弹簧。
     /// </summary>
     void FixedUpdate()
     {
@@ -210,14 +266,32 @@ public class RopeController : MonoBehaviour
         Vector3 p2 = rb2.transform.position;
         float dist = Vector3.Distance(p1, p2);
 
-        if (dist > config.ropeLength)
+        if (dist > currentRopeLength)
         {
-            Vector3 dir = (p2 - p1).normalized;
-            float stretch = dist - config.ropeLength;
+            Vector3 dir = (p2 - p1).normalized;        // P1 → P2 方向
+            float stretch = dist - currentRopeLength;
             float force = stretch * config.stretchStiffness * 50f;
 
-            rb1.AddForce(dir * force, ForceMode2D.Force);
-            rb2.AddForce(-dir * force, ForceMode2D.Force);
+            bool p1Pulling = player1Ctrl != null && player1Ctrl.IsPulling;
+            bool p2Pulling = player2Ctrl != null && player2Ctrl.IsPulling;
+
+            // 只有一个人在收绳 → 单向拖拽（只拉被收的人）
+            if (p1Pulling && !p2Pulling)
+            {
+                // P1 在收 → 把 P2 拉向 P1
+                rb2.AddForce(-dir * force, ForceMode2D.Force);
+            }
+            else if (p2Pulling && !p1Pulling)
+            {
+                // P2 在收 → 把 P1 拉向 P2
+                rb1.AddForce(dir * force, ForceMode2D.Force);
+            }
+            else
+            {
+                // 都没收或都在收 → 双向弹簧（保持现有逻辑）
+                rb1.AddForce(dir * force, ForceMode2D.Force);
+                rb2.AddForce(-dir * force, ForceMode2D.Force);
+            }
         }
     }
 
@@ -231,13 +305,7 @@ public class RopeController : MonoBehaviour
         // 绳子必须已初始化（有粒子 + 约束批次）
         if (!rope.Initialized) return;
 
-        // --- 绳长（只在值变化时调 ChangeLength）---
-        if (!Mathf.Approximately(config.ropeLength, lastAppliedLength))
-        {
-            lastAppliedLength = config.ropeLength;
-            if (cursor != null)
-                cursor.ChangeLength(config.ropeLength);
-        }
+        // --- 绳长：已由 UpdateRopeLength 动态管理，这里不再管 ---
 
         // --- 弯曲刚度 ---
         if (!Mathf.Approximately(config.bendingStiffness, lastAppliedBendingStiffness))

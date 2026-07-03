@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>对话系统 — 迭代文档 & 搭建指南</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --card: #16213e;
+    --accent: #e94560;
+    --text: #eee;
+    --muted: #a0a0b0;
+    --code-bg: #0f0f1a;
+    --border: #2a2a4a;
+    --tag-bg: #533483;
+    --good: #4ecca3;
+    --warn: #f0a500;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+    background: var(--bg); color: var(--text);
+    line-height: 1.7; padding: 2rem;
+  }
+  .container { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 2rem; border-bottom: 2px solid var(--accent); padding-bottom: .5rem; margin-bottom: .5rem; }
+  h1 .sub { font-size: 1rem; color: var(--muted); font-weight: normal; margin-left: .5rem; }
+  h2 { font-size: 1.35rem; margin: 2rem 0 .75rem; color: var(--accent); }
+  h3 { font-size: 1.05rem; margin: 1.25rem 0 .5rem; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.25rem; margin: 1rem 0;
+  }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: .5rem .75rem; border-bottom: 1px solid var(--border); }
+  th { color: var(--accent); font-size: .85rem; text-transform: uppercase; }
+  td:first-child { font-weight: 600; white-space: nowrap; }
+  code {
+    background: var(--code-bg); padding: .15em .4em;
+    border-radius: 4px; font-size: .88em; font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1rem; overflow-x: auto;
+    font-size: .82em; line-height: 1.5;
+  }
+  .tag {
+    display: inline-block; background: var(--tag-bg); color: #fff;
+    padding: .1em .55em; border-radius: 4px; font-size: .78em; margin-right: .3em;
+  }
+  .tag-iter { background: #e67e22; }
+  .good { color: var(--good); }
+  .warn { color: var(--warn); }
+  ul, ol { padding-left: 1.5rem; }
+  li { margin: .35rem 0; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+  .file-grid { display: grid; grid-template-columns: 1fr 2fr; gap: .5rem 1rem; }
+  .file-grid dt { font-weight: 600; font-family: monospace; }
+  .file-grid dd { color: var(--muted); }
+  hr { border: none; border-top: 1px solid var(--border); margin: 1.5rem 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+<h1>🎙️ 对话系统 <span class="sub">迭代文档 &amp; 场景搭建指南</span></h1>
+<p style="color:var(--muted)">2026-07-03 · Game Jam 第 N 轮迭代 · Unity 2022.3 + Mirror + URP</p>
+
+<!-- ──────────────────────────────────────────── -->
+<h2>📋 目录</h2>
+<ol class="toc">
+  <li><a href="#decisions">设计决策汇总</a></li>
+  <li><a href="#files">文件清单</a></li>
+  <li><a href="#data">数据流 &amp; 生命周期</a></li>
+  <li><a href="#setup">场景搭建步骤</a></li>
+  <li><a href="#iteration">迭代路线图</a></li>
+  <li><a href="#notes">注意事项 &amp; 已知问题</a></li>
+</ol>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="decisions">1. 设计决策汇总</h2>
+
+<div class="card">
+<table>
+  <tr><th>决策点</th><th>结论</th></tr>
+  <tr><td>UI 风格</td><td>混合式：中等立绘 + 对话框占主区域</td></tr>
+  <tr><td>Hierarchy</td><td>全局单例 <code>DialogueManager</code>，挂在场景 Canvas 上</td></tr>
+  <tr><td>触发方式</td><td>靠近 NPC 进入 Trigger + 按交互键</td></tr>
+  <tr><td>交互键</td><td>默认 <code>F</code>（P1 已用 <code>E</code> 传能量），Inspector 可改</td></tr>
+  <tr><td>对话数据</td><td>ScriptableObject（<code>DialogueSO</code>），多段顺序循环</td></tr>
+  <tr><td>对话结构</td><td>多角色对话，左右对站立绘</td></tr>
+  <tr><td>每行字段</td><td>角色名 + 台词 + 立绘 Sprite + 左右站位</td></tr>
+  <tr><td>动画风格</td><td>柔和过渡（DOTween 淡入淡出 0.3s）</td></tr>
+  <tr><td>打字机</td><td>TextAnimator (Febucci) TypewriterByCharacter，Bool 开关</td></tr>
+  <tr><td>推进方式</td><td>按空格/F → 先完成当前打字机 → 再按 → 下一句</td></tr>
+  <tr><td>输入禁用</td><td>时停（Time.timeScale=0）+ PlayerController 检查 DialogueManager.IsActive</td></tr>
+  <tr><td>玩家位置</td><td>对话中锁位置，禁全部输入（移动/攻击/跳跃）</td></tr>
+  <tr><td>网络</td><td>暂无，预留。后续用 Mirror Rpc 广播对话状态</td></tr>
+  <tr><td>立绘 Idle</td><td>暂不做，需美术资源</td></tr>
+</table>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="files">2. 文件清单</h2>
+
+<dl class="file-grid card">
+  <dt>Assets/Scripts/DialogueSO.cs</dt>
+  <dd>ScriptableObject 定义 —— <code>DialogueLine</code> 结构体 + <code>DialogueSO</code>（含 useTypingEffect / useAnimation 开关）</dd>
+
+  <dt>Assets/Scripts/DialogueManager.cs</dt>
+  <dd>全局单例，挂在 Canvas 上。管理对话面板显隐、逐行播放、TextAnimator 打字机、DOTween 立绘淡入动画</dd>
+
+  <dt>Assets/Scripts/DialogueTrigger.cs</dt>
+  <dd>挂在 NPC 上，Collider2D(IsTrigger) + F 键触发，多段顺序循环播放</dd>
+
+  <dt>Assets/Scripts/PlayerController.cs <span class="tag">已修改</span></dt>
+  <dd><code>Update()</code> 首行和 <code>FixedUpdate()</code> 首行增加 <code>DialogueManager.IsActive</code> 守卫</dd>
+</dl>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="data">3. 数据流 &amp; 生命周期</h2>
+
+<div class="card">
+<pre>
+玩家走进 NPC Trigger
+        │
+        ▼
+  DialogueTrigger 显示 Hint UI（可选）
+        │
+        ▼ 按 F
+  DialogueManager.StartDialogue(DialogueSO)
+        │
+        ├── Time.timeScale = 0          ← 游戏时停
+        ├── dialoguePanel.SetActive(true)
+        ├── PlayerController 检测 IsActive → return（禁用输入）
+        │
+        ▼
+  ShowLine(lines[0])
+        ├── UpdatePortraits()           ← 立绘显隐 + 可选 DOTween 淡入
+        ├── speakerNameText.text = ...
+        ├── useTypingEffect?
+        │     ├── true:  typewriter.ShowText() → 逐字打出
+        │     └── false: dialogueText.text = text（即时显示）
+        │
+        ▼
+  打字完成 / 即时显示 → OnTypingComplete()
+        ├── lineFullyShown = true
+        └── pressHint.SetActive(true)   ← "按 空格/F 继续"
+        │
+        ▼ 按 空格/F
+  如果 !lineFullyShown → CompleteTyping()（SkipTypewriter）
+  如果 lineFullyShown  → AdvanceDialogue()
+        │
+        ├── currentLineIndex++
+        ├── 如果还有行 → ShowLine(next)
+        └── 如果没有   → EndDialogue()
+                              ├── 停掉打字机
+                              ├── panel.SetActive(false)
+                              ├── 立绘复位
+                              └── Time.timeScale = 1
+</pre>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="setup">4. 场景搭建步骤</h2>
+
+<h3>4.1 创建对话 UI Canvas</h3>
+
+<div class="card">
+<p>在场景 Hierarchy 中创建（<strong>不是代码生成</strong>）：</p>
+<pre>
+Canvas (命名为 DialogueCanvas，Render Mode = Screen Space - Overlay)
+├── <strong>DialoguePanel</strong>                        ← Image，全屏半透明遮罩，初始 <code>SetActive = false</code>
+│   ├── <strong>LeftPortraitGo</strong>                     ← 空 GameObject（定位容器），初始 <code>SetActive = false</code>
+│   │   └── LeftPortrait (Image)            ← 立绘图，Anchor 左中
+│   ├── <strong>RightPortraitGo</strong>                    ← 空 GameObject（定位容器），初始 <code>SetActive = false</code>
+│   │   └── RightPortrait (Image)           ← 立绘图，Anchor 右中
+│   ├── <strong>SpeakerName</strong> (TMP_Text)            ← 说话人名字，居中偏上
+│   ├── <strong>DialogueText</strong> (TMP_Text)            ← 对话正文，底部对话框区域
+│   │   └── [挂] TextAnimator_TMP           ← Febucci 组件
+│   │   └── [挂] TypewriterByCharacter      ← Febucci 组件
+│   └── <strong>PressHint</strong> (TMP_Text)              ← 写 "按 空格/F 继续 ▶"，初始 <code>SetActive = false</code>
+</pre>
+</div>
+
+<h3>4.2 挂载 DialogueManager</h3>
+<div class="card">
+<p>在 <strong>Canvas (DialogueCanvas)</strong> 上 Add Component → <code>DialogueManager</code>，拖引用：</p>
+<table>
+  <tr><th>字段</th><th>拖什么</th></tr>
+  <tr><td>Dialogue Panel</td><td>DialoguePanel GameObject</td></tr>
+  <tr><td>Left Portrait</td><td>LeftPortrait Image</td></tr>
+  <tr><td>Right Portrait</td><td>RightPortrait Image</td></tr>
+  <tr><td>Left Portrait Go</td><td>LeftPortraitGo GameObject</td></tr>
+  <tr><td>Right Portrait Go</td><td>RightPortraitGo GameObject</td></tr>
+  <tr><td>Speaker Name Text</td><td>SpeakerName TMP_Text</td></tr>
+  <tr><td>Dialogue Text</td><td>DialogueText TMP_Text</td></tr>
+  <tr><td>Text Animator</td><td>TextAnimator_TMP 组件</td></tr>
+  <tr><td>Typewriter</td><td>TypewriterByCharacter 组件</td></tr>
+  <tr><td>Press Hint</td><td>PressHint GameObject</td></tr>
+</table>
+</div>
+
+<h3>4.3 配置 TextAnimator（打字机）</h3>
+<div class="card">
+<ol>
+  <li>选中 <strong>DialogueText</strong>（TMP_Text GameObject）</li>
+  <li>Add Component → <strong>Text Animator - TextMeshPro</strong></li>
+  <li>Add Component → <strong>Typewriter By Character</strong></li>
+  <li>推荐参数：
+    <ul>
+      <li><code>Wait For Normal Chars</code> = <strong>0.03</strong></li>
+      <li><code>Wait Long (! ? .)</code> = <strong>0.6</strong></li>
+      <li><code>Wait Middle (; : ) - ,)</code> = <strong>0.2</strong></li>
+    </ul>
+  </li>
+</ol>
+</div>
+
+<h3>4.4 创建对话数据 (DialogueSO)</h3>
+<div class="card">
+<ol>
+  <li>Project 窗口右键 → <strong>Create → GameJam → Dialogue</strong></li>
+  <li>命名如 <code>Dialogue_NPC001_Intro</code></li>
+  <li>填入 Lines 数组：
+    <ul>
+      <li><code>Speaker Name</code>：角色名</li>
+      <li><code>Text</code>：对话文本（支持 TextArea 多行）</li>
+      <li><code>Portrait</code>：拖入立绘 Sprite</li>
+      <li><code>Is Left Side</code>：true=左站位，false=右站位</li>
+    </ul>
+  </li>
+  <li>迭代开关（默认 false，后续勾选）：
+    <ul>
+      <li><code>Use Typing Effect</code>：启用 TextAnimator 逐字效果</li>
+      <li><code>Use Animation</code>：启用 DOTween 立绘淡入动画</li>
+    </ul>
+  </li>
+</ol>
+</div>
+
+<h3>4.5 配置 NPC + DialogueTrigger</h3>
+<div class="card">
+<ol>
+  <li>NPC GameObject 上：
+    <ul>
+      <li>确保有 <strong>Collider2D</strong>，勾选 <strong>Is Trigger = true</strong></li>
+      <li>Add Component → <strong>DialogueTrigger</strong></li>
+      <li><code>Dialogues</code> 数组拖入对应的 DialogueSO（可拖多个，按顺序循环）</li>
+      <li><code>Interact Key</code> 默认 F（Inspector 可改）</li>
+    </ul>
+  </li>
+  <li>可选：创建一个 World Space 气泡 UI 作为 <code>Hint UI</code>（"按 F 对话"），拖到 DialogueTrigger 的 Hint UI 字段</li>
+  <li>确保 <strong>Player 的 Tag = "Player"</strong></li>
+</ol>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="iteration">5. 迭代路线图</h2>
+
+<div class="card">
+<h3>✅ 当前 (v1.0) — 基础对话框架</h3>
+<ul>
+  <li>对话面板显隐 + Time.timeScale 时停</li>
+  <li>多行对话、多角色、左右立绘</li>
+  <li>先完句→再跳句 推进逻辑</li>
+  <li>DialogueSO ScriptableObject 数据驱动</li>
+  <li>PlayerController 对话中禁用输入</li>
+</ul>
+
+<h3><span class="tag tag-iter">迭代</span> v1.1 — 打字机效果</h3>
+<ul>
+  <li>勾选 DialogueSO 的 <code>useTypingEffect = true</code></li>
+  <li>依赖：DialogueText 上已挂 TextAnimator_TMP + TypewriterByCharacter</li>
+  <li>调 TypewriterByCharacter 的 waitForNormalChars 控制速度</li>
+</ul>
+
+<h3><span class="tag tag-iter">迭代</span> v1.2 — 立绘进出场动画</h3>
+<ul>
+  <li>勾选 DialogueSO 的 <code>useAnimation = true</code></li>
+  <li>立绘 DOTween 淡入（0.3s），非说话方变暗（alpha 0.3）</li>
+  <li>后续可扩展：侧边滑入、缩放弹入、说话方微微放大</li>
+</ul>
+
+<h3>🔮 未来 — 立绘 Idle、分支对话、网络同步</h3>
+<ul>
+  <li><strong>立绘 Idle</strong>：呼吸/微动/眨眼 —— 需动画师出资源</li>
+  <li><strong>对话分支</strong>：DialogueLine 加 choices 数组 + 跳转索引</li>
+  <li><strong>网络同步</strong>：全员时停 + 单人控制 → DialogueManager 加 [Command]/[ClientRpc]</li>
+  <li><strong>TextAnimator 内置标签</strong>：利用 Febucci 的 &lt;shake&gt;/&lt;wave&gt;/&lt;color&gt; 做文本演出</li>
+</ul>
+</div>
+
+<!-- ──────────────────────────────────────────── -->
+<h2 id="notes">6. 注意事项 &amp; 已知问题</h2>
+
+<div class="card">
+<h3>⚠️ 交互键冲突</h3>
+<ul>
+  <li>P1 的 <code>E</code> 键已用于能量传输（PlayerController line 108）</li>
+  <li>对话触发默认用 <code>F</code>，推进用 <code>空格</code> 或 <code>F</code></li>
+  <li>Inspector 里 <code>DialogueTrigger.interactKey</code> 可随时改</li>
+</ul>
+
+<h3>⚠️ Time.timeScale = 0 影响</h3>
+<ul>
+  <li><code>Update()</code> 仍然运行，但 <code>Time.deltaTime = 0</code></li>
+  <li><code>FixedUpdate()</code> 中 <code>Time.fixedDeltaTime = 0</code>，物理停止</li>
+  <li>DOTween 动画需加 <code>.SetUpdate(true)</code> 才能在时停中运行（DialogueManager 已处理）</li>
+  <li>AudioSource 不受 timeScale 影响（如需暂停音效，额外处理）</li>
+</ul>
+
+<h3>⚠️ IDE 报错 "DialogueManager 不存在"</h3>
+<ul>
+  <li>新脚本首次创建后 IDE 暂未编译 —— 切到 Unity 等它 Refresh/Compile 后自动消失</li>
+  <li>如果编译后仍报错，检查文件名与类名是否一致</li>
+</ul>
+
+<h3>⚠️ 玩家 Tag</h3>
+<ul>
+  <li><code>DialogueTrigger</code> 用 <code>CompareTag("Player")</code> 识别玩家</li>
+  <li>确保 Player GameObject 的 Tag 设为 <strong>Player</strong></li>
+</ul>
+</div>
+
+<hr>
+<p style="text-align:center;color:var(--muted);font-size:.85rem">
+  48h Game Jam · 跑起来就行 · 迭代优于完美
+</p>
+
+</div>
+</body>
+</html>

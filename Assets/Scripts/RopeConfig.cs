@@ -8,9 +8,21 @@ using UnityEngine;
 public class RopeConfig : ScriptableObject
 {
     [Header("绳索尺寸")]
-    [Tooltip("绳长（米）")]
-    [Range(1f, 10f)]
-    public float ropeLength = 3f;
+    [Tooltip("初始绳长（米），绳子生成时的长度")]
+    [Range(1f, 20f)]
+    public float initialRopeLength = 5f;
+
+    [Tooltip("最大绳长（米），绳子最多伸到这么长")]
+    [Range(1f, 20f)]
+    public float ropeLength = 10f;
+
+    [Tooltip("最小绳长（米），收到极限的长度")]
+    [Range(0.5f, 5f)]
+    public float minRopeLength = 2.5f;
+
+    [Tooltip("收绳速率（米/秒）")]
+    [Range(1f, 20f)]
+    public float retractionSpeed = 8f;
 
     [Tooltip("绳索粗细")]
     [Range(0.01f, 0.2f)]

@@ -4,9 +4,33 @@ using UnityEngine;
 /// 太空惯性移动 —— 无重力漂浮 + 喷气背包。
 /// P1 (playerIndex=0): WASD 四方向喷气
 /// P2 (playerIndex=1): 方向键 四方向喷气
+///
+/// ★ 所有键位集中定义在此，其他脚本直接引用 PlayerController.P1_Snap 等
 /// </summary>
 public class PlayerController : MonoBehaviour
 {
+    // ============ 统一键位表 ============
+    // P1
+    public const KeyCode P1_JetUp      = KeyCode.W;
+    public const KeyCode P1_JetLeft    = KeyCode.A;
+    public const KeyCode P1_JetRight   = KeyCode.D;
+    public const KeyCode P1_Transfer   = KeyCode.E;
+    public const KeyCode P1_PullRope   = KeyCode.Q;
+    public const KeyCode P1_Snap       = KeyCode.LeftShift;
+
+    // P2
+    public const KeyCode P2_JetUp      = KeyCode.UpArrow;
+    public const KeyCode P2_JetLeft    = KeyCode.LeftArrow;
+    public const KeyCode P2_JetRight   = KeyCode.RightArrow;
+    public const KeyCode P2_Transfer   = KeyCode.Keypad0;
+    public const KeyCode P2_PullRope   = KeyCode.RightControl;
+    public const KeyCode P2_Snap       = KeyCode.Return;
+
+    // 通用
+    public const KeyCode Interact          = KeyCode.F;
+    public const KeyCode DialogueAdvance   = KeyCode.Space;
+    public const KeyCode DialogueAdvanceAlt = KeyCode.F;
+    // =====================================
     [Header("玩家索引")]
     [Tooltip("0 = P1 (WASD), 1 = P2 (方向键)")]
     public int playerIndex = 0;
@@ -44,10 +68,9 @@ public class PlayerController : MonoBehaviour
     public PlayerController otherPlayer;
     [Tooltip("按住传输键时每秒传给队友的能量")]
     [SerializeField] float transferRate = 30f;
-    [Tooltip("拉队友时施加的力，越大拉得越猛")]
-    [SerializeField] float pullForce = 4f;
-    KeyCode transferKey;
-    KeyCode pullKey;
+
+    /// <summary>是否正在按收绳键（给 RopeController 读）</summary>
+    public bool IsPulling { get; private set; }
 
     [Header("TA 效果")]
     [Tooltip("摄像机抖动组件引用")]
@@ -64,12 +87,12 @@ public class PlayerController : MonoBehaviour
     [SerializeField] GameObject shockwavePrefab;
 
     Rigidbody2D rb;
-    Rigidbody2D otherRb;
     SpriteRenderer spriteRenderer;
     bool isAnchored;
     bool isFlyingToAnchor;
     AnchorPoint anchoredAt;
-    float surfaceT; // 玩家在表面上的当前距离（沿周长，圆和多边形统一）
+    float surfaceT;           // 玩家在表面上的当前距离（沿周长，圆和多边形统一）
+    float smoothedAngle;      // 平滑后的当前旋转角度（度），用于 LerpAngle
 
     // ---- 生命周期 ----
 
@@ -92,22 +115,6 @@ public class PlayerController : MonoBehaviour
     {
         currentEnergy = maxEnergy;
 
-        // 缓存队友 Rigidbody2D
-        if (otherPlayer != null)
-            otherRb = otherPlayer.GetComponent<Rigidbody2D>();
-
-        // 设置交互按键
-        if (playerIndex == 0)
-        {
-            transferKey = KeyCode.E;
-            pullKey = KeyCode.Q;
-        }
-        else
-        {
-            transferKey = KeyCode.Keypad0;
-            pullKey = KeyCode.RightControl;
-        }
-
         spawnBounce?.Play();
 
         Color[] colors = { Color.cyan, Color.red };
@@ -116,13 +123,16 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
+        // 对话中禁用所有输入
+        if (DialogueManager.IsActive) return;
+
         // ★ 瞬时喷气：在 Update 捕获 GetKeyDown，避免 FixedUpdate 丢帧
-        pendingJetImpulse = GetJetInputDown();
+        pendingJetImpulse += GetJetInputDown();
 
         if (otherPlayer == null) return;
 
         // ★ 能量传输：按住给队友传能量（对方满了就停）
-        if (Input.GetKey(transferKey) && currentEnergy > 0f)
+        if (Input.GetKey(playerIndex == 0 ? P1_Transfer : P2_Transfer) && currentEnergy > 0f)
         {
             float amount = transferRate * Time.deltaTime;
             amount = Mathf.Min(amount, currentEnergy);
@@ -135,20 +145,19 @@ public class PlayerController : MonoBehaviour
             }
         }
 
-        // ★ 拉队友：按住把队友拉向自己（靠太近就拉不动）
-        if (Input.GetKey(pullKey) && otherRb != null)
-        {
-            float dist = Vector3.Distance(transform.position, otherPlayer.transform.position);
-            if (dist > 2.6f) // 最小距离，防止重叠
-            {
-                Vector3 dir = (transform.position - otherPlayer.transform.position).normalized;
-                otherRb.AddForce(dir * pullForce, ForceMode2D.Force);
-            }
-        }
+        // ★ 收绳：暴露给 RopeController 读
+        IsPulling = Input.GetKey(playerIndex == 0 ? P1_PullRope : P2_PullRope);
     }
 
     void FixedUpdate()
     {
+        // 对话中禁用所有物理移动
+        if (DialogueManager.IsActive)
+        {
+            IsJetting = false;
+            return;
+        }
+
         // 飞行中：不处理物理，让协程驱动位置
         if (isFlyingToAnchor)
         {
@@ -160,15 +169,23 @@ public class PlayerController : MonoBehaviour
         // ★ 星球表面移动：沿表面切向移动，头朝外、脚朝球心（圆/多边形统一）
         if (isAnchored)
         {
-            Vector2 jetInput = GetJetInput();
-
-            float moveDir = 0f;
-            if (jetInput.x > 0.01f) moveDir = -1f;
-            else if (jetInput.x < -0.01f) moveDir = 1f;
-
-            if (Mathf.Abs(moveDir) > 0.01f)
+            // 直接读原始水平输入，不用世界空间转换（避免法线方向影响移动）
+            float rawHorizontal = 0f;
+            if (playerIndex == 0)
             {
-                surfaceT += moveDir * jetForce * Time.fixedDeltaTime;
+                if (Input.GetKey(P1_JetLeft))  rawHorizontal -= 1f;
+                if (Input.GetKey(P1_JetRight)) rawHorizontal += 1f;
+            }
+            else
+            {
+                if (Input.GetKey(P2_JetLeft))  rawHorizontal -= 1f;
+                if (Input.GetKey(P2_JetRight)) rawHorizontal += 1f;
+            }
+
+            if (Mathf.Abs(rawHorizontal) > 0.01f)
+            {
+                // D/→ = 顺时针增加 surfaceT，A/← = 逆时针减少 surfaceT
+                surfaceT += rawHorizontal * jetForce * Time.fixedDeltaTime;
                 IsJetting = true;
             }
             else
@@ -177,6 +194,8 @@ public class PlayerController : MonoBehaviour
             }
 
             Vector2 targetPos = anchoredAt.GetSurfacePoint(surfaceT);
+
+            // ★ 统一用预采样的表面法线（圆形：数学公式，多边形：边法线插值）
             Vector2 normal = anchoredAt.GetSurfaceNormal(surfaceT);
 
             rb.MovePosition(targetPos);
@@ -184,7 +203,9 @@ public class PlayerController : MonoBehaviour
             rb.angularVelocity = 0f;
 
             float targetAngle = Mathf.Atan2(normal.y, normal.x) * Mathf.Rad2Deg - 90f;
-            rb.MoveRotation(targetAngle);
+            // ★ 平滑旋转过渡（拐角处不会突然跳变）
+            smoothedAngle = Mathf.LerpAngle(smoothedAngle, targetAngle, 20f * Time.fixedDeltaTime);
+            rb.MoveRotation(smoothedAngle);
 
             return;
         }
@@ -211,26 +232,6 @@ public class PlayerController : MonoBehaviour
 
     // ---- 输入 (Module 2: 四方向喷气) ----
 
-    Vector2 GetJetInput()
-    {
-        Vector2 raw = Vector2.zero;
-
-        if (playerIndex == 0)
-        {
-            if (Input.GetKey(KeyCode.W)) raw.y += 1;
-            if (Input.GetKey(KeyCode.A)) raw.x -= 1;
-            if (Input.GetKey(KeyCode.D)) raw.x += 1;
-        }
-        else
-        {
-            if (Input.GetKey(KeyCode.UpArrow))    raw.y += 1;
-            if (Input.GetKey(KeyCode.LeftArrow))  raw.x -= 1;
-            if (Input.GetKey(KeyCode.RightArrow)) raw.x += 1;
-        }
-
-        return RawToWorldDir(raw);
-    }
-
     /// <summary>瞬时喷气输入：按下那一帧才返回方向（星球表面不用这个）</summary>
     Vector2 GetJetInputDown()
     {
@@ -238,15 +239,15 @@ public class PlayerController : MonoBehaviour
 
         if (playerIndex == 0)
         {
-            if (Input.GetKeyDown(KeyCode.W)) raw.y += 1;
-            if (Input.GetKeyDown(KeyCode.A)) raw.x -= 1;
-            if (Input.GetKeyDown(KeyCode.D)) raw.x += 1;
+            if (Input.GetKeyDown(P1_JetUp))    raw.y += 1;
+            if (Input.GetKeyDown(P1_JetLeft))  raw.x -= 1;
+            if (Input.GetKeyDown(P1_JetRight)) raw.x += 1;
         }
         else
         {
-            if (Input.GetKeyDown(KeyCode.UpArrow))    raw.y += 1;
-            if (Input.GetKeyDown(KeyCode.LeftArrow))  raw.x -= 1;
-            if (Input.GetKeyDown(KeyCode.RightArrow)) raw.x += 1;
+            if (Input.GetKeyDown(P2_JetUp))    raw.y += 1;
+            if (Input.GetKeyDown(P2_JetLeft))  raw.x -= 1;
+            if (Input.GetKeyDown(P2_JetRight)) raw.x += 1;
         }
 
         return RawToWorldDir(raw);
@@ -322,8 +323,14 @@ public class PlayerController : MonoBehaviour
 
         anchoredAt = anchor;
 
-        // ★ 初始化 surfaceT：根据到达位置在表面上的距离
-        surfaceT = anchor.FindClosestSurfaceT(transform.position);
+        // ★ 初始化 surfaceT 和旋转：根据到达位置
+        // 用 rb.position 而非 transform.position，确保读到物理体已同步的位置
+        Vector2 attachPos = rb != null ? rb.position : (Vector2)transform.position;
+        surfaceT = anchor.FindClosestSurfaceT(attachPos);
+        Vector2 initNormal = anchor.GetSurfaceNormal(surfaceT);
+        smoothedAngle = Mathf.Atan2(initNormal.y, initNormal.x) * Mathf.Rad2Deg - 90f;
+        // 立即应用旋转，不等下一帧 FixedUpdate
+        if (rb != null) rb.MoveRotation(smoothedAngle);
 
         // ★ 不锁 Z 轴：允许玩家随表面旋转自由翻转
         if (rb != null)
