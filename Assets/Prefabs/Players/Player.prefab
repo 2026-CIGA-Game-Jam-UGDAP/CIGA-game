@@ -106,7 +106,7 @@ Rigidbody2D:
   m_Mass: 1
   m_LinearDrag: 1.5
   m_AngularDrag: 0.05
-  m_GravityScale: 1
+  m_GravityScale: 0
   m_Material: {fileID: 0}
   m_IncludeLayers:
     serializedVersion: 2
@@ -179,15 +179,13 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerIndex: 0
-  moveForce: 8
+  jetForce: 8
   maxSpeed: 6
-  jumpForce: 10
   linearDrag: 1.5
-  groundLayer:
-    serializedVersion: 2
-    m_Bits: 64
-  groundCheckRadius: 0.15
-  groundCheckPoint: {fileID: 7827058169241461549}
+  maxEnergy: 100
+  drainRate: 25
+  regenRate: 12
+  regenDelay: 1
   cameraShake: {fileID: 0}
   spriteFlash: {fileID: 0}
   damagePulse: {fileID: 0}

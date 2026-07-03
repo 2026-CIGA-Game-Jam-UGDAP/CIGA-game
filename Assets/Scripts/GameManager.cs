@@ -25,6 +25,11 @@ public class GameManager : MonoBehaviour
     [Tooltip("玩家掉到这个 Y 值以下即死亡")]
     public float deathY = -10f;
 
+    [Header("通关零件")]
+    [Tooltip("场景中 Goal 类型 Pickup 的总数")]
+    public int totalGoalPickups = 3;
+    int collectedGoals;
+
     [Header("重来效果")]
     public Image fadeImage;          // 全屏黑色 Image（DoTween 控制 alpha）
     public float fadeDuration = 0.3f;
@@ -71,6 +76,15 @@ public class GameManager : MonoBehaviour
     {
         if (playerIndex == 0) p1AtGoal = false;
         if (playerIndex == 1) p2AtGoal = false;
+    }
+
+    /// <summary>Goal 类型 Pickup 被拾取时调用</summary>
+    public void OnGoalPickupCollected()
+    {
+        collectedGoals++;
+        Debug.Log($"[GameManager] 零件 {collectedGoals}/{totalGoalPickups}");
+        if (collectedGoals >= totalGoalPickups)
+            Victory();
     }
 
     /// <summary>绳索断裂时 Obi 调用</summary>
@@ -136,6 +150,7 @@ public class GameManager : MonoBehaviour
 
         p1AtGoal = false;
         p2AtGoal = false;
+        collectedGoals = 0;
 
         // 7. 重新启用绳索
         if (rope != null)

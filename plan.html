@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>绳索宇航员 — 迭代计划</title>
+<style>
+  :root {
+    --bg: #0a0a14;
+    --card: #12122a;
+    --accent: #6ee7ff;
+    --accent2: #ff6ec7;
+    --text: #c8d6e5;
+    --muted: #6b7280;
+    --border: #1e1e3a;
+    --done: #2dd4bf;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 2rem;
+  }
+  h1 { text-align: center; font-size: 2.4rem; color: var(--accent); margin-bottom: 0.3rem; letter-spacing: 2px; }
+  .subtitle { text-align: center; color: var(--muted); margin-bottom: 2.5rem; font-size: 0.95rem; }
+
+  .timeline { display: flex; flex-direction: column; gap: 24px; max-width: 860px; margin: 0 auto; }
+
+  .module {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    position: relative;
+    transition: border-color 0.3s;
+  }
+  .module:hover { border-color: var(--accent); }
+  .module.done { border-color: var(--done); }
+
+  .module-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+  .badge {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: var(--accent);
+    color: #0a0a14;
+    font-weight: 900;
+    font-size: 1.2rem;
+    flex-shrink: 0;
+  }
+  .module.done .badge { background: var(--done); }
+
+  .module-header h2 { font-size: 1.35rem; color: #f0f0ff; }
+  .module-header .file-tag {
+    font-size: 0.78rem; background: #1a1a3a; color: var(--muted);
+    padding: 2px 10px; border-radius: 4px; letter-spacing: 0.5px;
+  }
+
+  .desc { margin-bottom: 16px; color: #a0aec0; }
+
+  ul { padding-left: 20px; margin-bottom: 14px; }
+  li { margin-bottom: 5px; }
+  li::marker { color: var(--accent); }
+
+  .code-block {
+    background: #08081a;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    font-family: 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.82rem;
+    color: #a5d6ff;
+    overflow-x: auto;
+    white-space: pre;
+    margin-bottom: 12px;
+  }
+  .code-block .kw { color: #c792ea; }
+  .code-block .fn { color: #82aaff; }
+  .code-block .cmt { color: #546e7a; font-style: italic; }
+  .code-block .num { color: #f78c6c; }
+
+  .checklist { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip {
+    font-size: 0.8rem; padding: 4px 14px; border-radius: 20px;
+    background: #16213e; color: var(--text); border: 1px solid #2a2a4a;
+  }
+  .chip.del { text-decoration: line-through; color: #f44; background: #1a1018; border-color: #3a1a1a; }
+  .chip.add { color: #2dd4bf; background: #0a1a18; border-color: #1a3a2a; }
+
+  .flow { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+  .flow-step {
+    background: #16213e; border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 18px; font-size: 0.85rem; text-align: center;
+    min-width: 80px;
+  }
+  .flow-step strong { display: block; color: var(--accent); margin-bottom: 3px; }
+
+  .energy-bar-demo {
+    height: 18px; background: #1a1a3a; border-radius: 10px; overflow: hidden; margin: 10px 0;
+  }
+  .energy-bar-demo .fill {
+    height: 100%; background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    border-radius: 10px; transition: width 0.5s;
+  }
+
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0 20px; }
+  .summary { max-width: 860px; margin: 0 auto 30px; }
+  .summary table { width: 100%; border-collapse: collapse; }
+  .summary th, .summary td {
+    border: 1px solid var(--border); padding: 10px 14px; text-align: left; font-size: 0.9rem;
+  }
+  .summary th { background: #16213e; color: var(--accent); }
+  .summary td:last-child { text-align: center; }
+
+  .tag-pre { color: #f78c6c; }
+  .tag-post { color: #2dd4bf; }
+</style>
+</head>
+<body>
+
+<h1>🎯 绳索宇航员 · 迭代计划</h1>
+<p class="subtitle">从横版跳跃 → 太空探索 | 4 个模块依次交付</p>
+
+<div class="timeline">
+
+<!-- ========== MODULE 1 ========== -->
+<div class="module" id="m1">
+  <div class="module-header">
+    <span class="badge">1</span>
+    <div>
+      <h2>Zero-G 漂浮系统</h2>
+      <span class="file-tag">PlayerController.cs</span>
+    </div>
+  </div>
+  <p class="desc">
+    把横版跳跃改成太空惯性漂浮。核心思路：<strong>关掉重力</strong>、
+    <strong>关掉跳跃</strong>、<strong>加线性阻尼让玩家自然减速漂浮</strong>。
+  </p>
+
+  <h3>改动清单</h3>
+  <ul>
+    <li>Rigidbody2D.gravityScale → 0（无重力）</li>
+    <li>删除 isGrounded / groundCheck 相关代码</li>
+    <li>删除跳跃逻辑（IsJumpPressed / jumpForce）</li>
+    <li>linearDrag 降低到 0.3~0.5，产生"惯性漂移"手感</li>
+    <li>保留 moveForce / maxSpeed（后续 jetpack 用）</li>
+    <li>删除水平移动的 FixedUpdate 加力逻辑（移到 jetpack 模块）</li>
+  </ul>
+
+  <div class="checklist">
+    <span class="chip del">gravityScale=1</span>
+    <span class="chip del">jumpForce / 跳跃</span>
+    <span class="chip del">groundCheck / isGrounded</span>
+    <span class="chip add">gravityScale=0</span>
+    <span class="chip add">linearDrag=0.3 太空漂移</span>
+    <span class="chip add">保留 Rigidbody2D 物理</span>
+  </div>
+
+  <h3 style="margin-top:16px;">关键代码差异</h3>
+  <div class="code-block"><span class="cmt">// Awake() — 原来是 linearDrag，现在额外关重力</span>
+<span class="kw">void</span> <span class="fn">Awake</span>() {
+    rb = GetComponent&lt;Rigidbody2D&gt;();
+    <span class="cmt">// ★ 太空：无重力 + 低阻尼漂浮</span>
+    rb.gravityScale = <span class="num">0f</span>;
+    rb.drag = <span class="num">0.3f</span>;   <span class="cmt">// 越低越滑</span>
+}
+
+<span class="cmt">// Update() — 删除地面检测和跳跃，只留输入</span>
+<span class="kw">void</span> <span class="fn">Update</span>() {
+    <span class="cmt">// 输入处理（jetpack 模块接管）</span>
+    ReadJetInput();
+}
+
+<span class="cmt">// FixedUpdate() — 删除旧的横向加力，等 jetpack 重写</span>
+<span class="kw">void</span> <span class="fn">FixedUpdate</span>() {
+    <span class="cmt">// 由 JetpackThrust() 处理（Module 2 加入）</span>
+}</div>
+</div>
+
+<!-- ========== MODULE 2 ========== -->
+<div class="module" id="m2">
+  <div class="module-header">
+    <span class="badge">2</span>
+    <div>
+      <h2>喷气背包 · 四方向推进</h2>
+      <span class="file-tag">PlayerController.cs</span>
+    </div>
+  </div>
+  <p class="desc">
+    WASD 每个方向独立喷气。按住键 = 持续在那个方向加力，松开 = 惯性漂移。
+    两个玩家各自独立控制。
+  </p>
+
+  <h3>输入映射</h3>
+  <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+    <tr style="background:#16213e;"><th>方向</th><th>P1 (WASD)</th><th>P2 (方向键)</th></tr>
+    <tr><td style="color:#6ee7ff;">↑ 上</td><td>W</td><td>↑ Arrow</td></tr>
+    <tr><td style="color:#6ee7ff;">↓ 下</td><td>S</td><td>↓ Arrow</td></tr>
+    <tr><td style="color:#6ee7ff;">← 左</td><td>A</td><td>← Arrow</td></tr>
+    <tr><td style="color:#6ee7ff;">→ 右</td><td>D</td><td>→ Arrow</td></tr>
+  </table>
+
+  <div class="code-block"><span class="cmt">// FixedUpdate — 四方向喷气推力</span>
+<span class="kw">void</span> <span class="fn">FixedUpdate</span>() {
+    Vector2 input = GetJetInput();   <span class="cmt">// WASD → Vector2</span>
+    <span class="kw">if</span> (input.sqrMagnitude &gt; <span class="num">0.01f</span>) {
+        <span class="cmt">// 有能量才能喷（Module 3 接入）</span>
+        rb.AddForce(input.normalized * jetForce, ForceMode2D.Force);
+        ConsumeEnergy(input.magnitude);  <span class="cmt">// Module 3</span>
+    }
+    <span class="cmt">// 惯性限速（所有方向统一上限）</span>
+    rb.velocity = Vector2.ClampMagnitude(rb.velocity, maxSpeed);
+}
+
+<span class="cmt">// 只读输入，不处理物理</span>
+Vector2 <span class="fn">GetJetInput</span>() {
+    Vector2 v = Vector2.zero;
+    <span class="kw">if</span> (playerIndex == <span class="num">0</span>) {
+        <span class="kw">if</span> (Input.GetKey(KeyCode.W)) v.y += <span class="num">1</span>;
+        <span class="kw">if</span> (Input.GetKey(KeyCode.S)) v.y -= <span class="num">1</span>;
+        <span class="kw">if</span> (Input.GetKey(KeyCode.A)) v.x -= <span class="num">1</span>;
+        <span class="kw">if</span> (Input.GetKey(KeyCode.D)) v.x += <span class="num">1</span>;
+    } <span class="kw">else</span> {
+        <span class="kw">if</span> (Input.GetKey(KeyCode.UpArrow))    v.y += <span class="num">1</span>;
+        <span class="kw">if</span> (Input.GetKey(KeyCode.DownArrow))  v.y -= <span class="num">1</span>;
+        <span class="kw">if</span> (Input.GetKey(KeyCode.LeftArrow))  v.x -= <span class="num">1</span>;
+        <span class="kw">if</span> (Input.GetKey(KeyCode.RightArrow)) v.x += <span class="num">1</span>;
+    }
+    <span class="kw">return</span> v;
+}</div>
+
+  <div class="checklist">
+    <span class="chip add">jetForce=6~8</span>
+    <span class="chip add">全方向加力</span>
+    <span class="chip add">惯性限速 Vector2.ClampMagnitude</span>
+    <span class="chip del">旧的只有X轴加力</span>
+  </div>
+</div>
+
+<!-- ========== MODULE 3 ========== -->
+<div class="module" id="m3">
+  <div class="module-header">
+    <span class="badge">3</span>
+    <div>
+      <h2>喷气背包 · 能量系统</h2>
+      <span class="file-tag">PlayerController.cs</span>
+    </div>
+  </div>
+  <p class="desc">
+    喷气消耗能量，停止喷气自动回复。能量归零不能喷气。Inspector 里调数值找手感。
+  </p>
+
+  <h3>参数设计</h3>
+  <div class="flow">
+    <div class="flow-step"><strong>maxEnergy=100</strong>能量上限</div>
+    <div class="flow-step"><strong>drainRate=25/s</strong>每秒消耗</div>
+    <div class="flow-step"><strong>regenRate=12/s</strong>每秒回复</div>
+    <div class="flow-step"><strong>regenDelay=1s</strong>停止喷气后延迟</div>
+  </div>
+
+  <div class="energy-bar-demo">
+    <div class="fill" style="width:65%"></div>
+  </div>
+  <p style="font-size:0.82rem; color:var(--muted); text-align:center;">能量条示意（占位，实际用 UI Image fill）</p>
+
+  <div class="code-block"><span class="cmt">// 能量变量</span>
+[SerializeField] <span class="kw">float</span> maxEnergy     = <span class="num">100f</span>;
+[SerializeField] <span class="kw">float</span> drainRate    = <span class="num">25f</span>;
+[SerializeField] <span class="kw">float</span> regenRate    = <span class="num">12f</span>;
+[SerializeField] <span class="kw">float</span> regenDelay   = <span class="num">1f</span>;
+<span class="kw">float</span> currentEnergy;
+<span class="kw">float</span> lastJetTime;      <span class="cmt">// Time.time 上次喷气时间</span>
+
+<span class="kw">void</span> <span class="fn">Start</span>() { currentEnergy = maxEnergy; }
+
+<span class="kw">void</span> <span class="fn">Update</span>() {
+    <span class="cmt">// 喷气后延迟 regenDelay 秒才开始回复</span>
+    <span class="kw">if</span> (Time.time - lastJetTime &gt; regenDelay)
+        currentEnergy = Mathf.Min(maxEnergy, currentEnergy + regenRate * Time.deltaTime);
+}
+
+<span class="kw">bool</span> <span class="fn">TryConsumeEnergy</span>(<span class="kw">float</span> amount) {
+    <span class="kw">if</span> (currentEnergy &lt;= <span class="num">0f</span>) <span class="kw">return false</span>;
+    currentEnergy -= amount;
+    <span class="kw">if</span> (currentEnergy &lt; <span class="num">0f</span>) currentEnergy = <span class="num">0f</span>;
+    lastJetTime = Time.time;
+    <span class="kw">return true</span>;
+}
+</div>
+</div>
+
+<!-- ========== MODULE 4 ========== -->
+<div class="module" id="m4">
+  <div class="module-header">
+    <span class="badge">4</span>
+    <div>
+      <h2>锚点吸附系统</h2>
+      <span class="file-tag">AnchorPoint.cs（新建） + PlayerController.cs</span>
+    </div>
+  </div>
+  <p class="desc">
+    场景中放置锚点。玩家靠近锚点时按 <strong>吸附键</strong>（如 F / 右Shift），
+    快速飞到锚点位置。可用于太空探索中的"抓握跳跃"。
+  </p>
+
+  <div class="flow">
+    <div class="flow-step"><strong>① 靠近锚点</strong>锚点半径内</div>
+    <div class="flow-step"><strong>② 提示弹出</strong>按F吸附</div>
+    <div class="flow-step"><strong>③ 按下按键</strong>触发吸附</div>
+    <div class="flow-step"><strong>④ 飞到锚点</strong>速度清零</div>
+  </div>
+
+  <h3>AnchorPoint 脚本（新建）</h3>
+  <div class="code-block"><span class="cmt">// AnchorPoint.cs — 挂在场景中的锚点 GameObject 上</span>
+<span class="kw">public class</span> <span class="fn">AnchorPoint</span> : MonoBehaviour {
+    [SerializeField] <span class="kw">float</span> snapRadius = <span class="num">3f</span>;     <span class="cmt">// 玩家多远能吸附</span>
+    [SerializeField] <span class="kw">float</span> snapSpeed  = <span class="num">12f</span>;    <span class="cmt">// 吸附飞行速度</span>
+    [SerializeField] <span class="kw">SpriteRenderer</span> indicator; <span class="cmt">// 可选：提示图标</span>
+
+    <span class="kw">bool</span> playerInRange;
+
+    <span class="kw">void</span> <span class="fn">OnTriggerEnter2D</span>(Collider2D other) {
+        <span class="kw">if</span> (other.GetComponent&lt;PlayerController&gt;())
+            playerInRange = <span class="kw">true</span>;
+    }
+
+    <span class="kw">void</span> <span class="fn">OnTriggerExit2D</span>(Collider2D other) {
+        <span class="kw">if</span> (other.GetComponent&lt;PlayerController&gt;())
+            playerInRange = <span class="kw">false</span>;
+    }
+
+    <span class="kw">void</span> <span class="fn">Update</span>() {
+        <span class="kw">if</span> (playerInRange && Input.GetKeyDown(KeyCode.F)) {
+            <span class="cmt">// 找到范围内的玩家，触发吸附</span>
+            <span class="kw">var</span> player = FindNearbyPlayer();
+            <span class="kw">if</span> (player != null)
+                player.StartSnapTo(transform.position, snapSpeed);
+        }
+    }
+}</div>
+
+  <h3>PlayerController 吸附方法</h3>
+  <div class="code-block"><span class="cmt">// 加到 PlayerController</span>
+<span class="kw">public void</span> <span class="fn">StartSnapTo</span>(Vector3 target, <span class="kw">float</span> speed) {
+    StartCoroutine(SnapRoutine(target, speed));
+}
+
+IEnumerator <span class="fn">SnapRoutine</span>(Vector3 target, <span class="kw">float</span> speed) {
+    isSnapping = <span class="kw">true</span>;
+    rb.velocity = Vector2.zero;
+    <span class="kw">while</span> (Vector3.Distance(transform.position, target) &gt; <span class="num">0.1f</span>) {
+        transform.position = Vector3.MoveTowards(
+            transform.position, target, speed * Time.deltaTime);
+        <span class="kw">yield return null</span>;
+    }
+    transform.position = target;
+    rb.velocity = Vector2.zero;
+    isSnapping = <span class="kw">false</span>;
+}</div>
+</div>
+
+<!-- ========== SUMMARY ========== -->
+</div>
+
+<hr>
+<div class="summary">
+  <h2 style="color:var(--accent); margin-bottom:16px;">📋 迭代总览</h2>
+  <table>
+    <tr><th>模块</th><th>涉及文件</th><th>改动类型</th><th>预计耗时</th></tr>
+    <tr>
+      <td>1. Zero-G 漂浮</td>
+      <td>PlayerController.cs</td>
+      <td><span class="tag-pre">重构</span></td>
+      <td>~10 min</td>
+    </tr>
+    <tr>
+      <td>2. 四方向喷气</td>
+      <td>PlayerController.cs</td>
+      <td><span class="tag-pre">重构</span></td>
+      <td>~15 min</td>
+    </tr>
+    <tr>
+      <td>3. 能量系统</td>
+      <td>PlayerController.cs</td>
+      <td><span class="tag-post">新增</span></td>
+      <td>~15 min</td>
+    </tr>
+    <tr>
+      <td>4. 锚点吸附</td>
+      <td>AnchorPoint.cs (新) + PlayerController.cs</td>
+      <td><span class="tag-post">新增</span></td>
+      <td>~15 min</td>
+    </tr>
+  </table>
+
+  <p style="margin-top:20px; color:var(--muted); font-size:0.9rem;">
+    ⚡ 4 个模块都是 <strong>PlayerController.cs</strong> 单文件改动为主（GameJam 风格）<br>
+    📐 每个模块可独立测试：做完一个、跑起来验证、再做下一个<br>
+    📝 Mirror 网络同步暂不处理 — 先本地双人跑通
+  </p>
+</div>
+
+</body>
+</html>

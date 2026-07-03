@@ -20,6 +20,8 @@ public class RopeController : MonoBehaviour
     [Header("玩家（需要有 ObiCollider 组件）")]
     public ObiColliderBase player1Collider;
     public ObiColliderBase player2Collider;
+    [Tooltip("Pin 约束偏移。调 Y 值把绳从脚底提到角色中心")]
+    public Vector3 pinOffset = Vector3.zero;
 
     [Header("配置")]
     public RopeConfig config;
@@ -101,14 +103,14 @@ public class RopeController : MonoBehaviour
         // 粒子 0 → Player1
         if (player1Collider != null && particleCount > 0)
         {
-            batch.AddConstraint(0, player1Collider, Vector3.zero, Quaternion.identity, 1);
+            batch.AddConstraint(0, player1Collider, pinOffset, Quaternion.identity, 1);
             Debug.Log("[RopeController] Pin: 粒子 0 → Player1");
         }
 
         // 粒子 N → Player2
         if (player2Collider != null && particleCount > 1)
         {
-            batch.AddConstraint(particleCount - 1, player2Collider, Vector3.zero, Quaternion.identity, 1);
+            batch.AddConstraint(particleCount - 1, player2Collider, pinOffset, Quaternion.identity, 1);
             Debug.Log("[RopeController] Pin: 粒子 " + (particleCount - 1) + " → Player2");
         }
 
