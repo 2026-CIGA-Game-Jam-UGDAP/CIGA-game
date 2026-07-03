@@ -67,6 +67,7 @@ public class PlayerController : MonoBehaviour
     bool isFlyingToAnchor;
     AnchorPoint anchoredAt;
     float anchorMoveRadius;
+    float surfaceAngle; // 玩家在星球表面的当前角度（弧度）
 
     // ---- 生命周期 ----
 
@@ -80,6 +81,8 @@ public class PlayerController : MonoBehaviour
             // ★ 太空：无重力 + 低阻尼漂浮
             rb.gravityScale = 0f;
             rb.drag = linearDrag;
+            // ★ 自由飞行锁定 Z 旋转，吸附时解锁
+            rb.constraints |= RigidbodyConstraints2D.FreezeRotation;
         }
     }
 
@@ -149,13 +152,20 @@ public class PlayerController : MonoBehaviour
             return;
         }
 
-        // 已吸附：可在锚点范围内自由移动，不耗能，边界软弹回
+        // ★ 星球表面移动：沿球表面切向移动，头朝外、脚朝球心
         if (isAnchored)
         {
-            Vector2 anchoredInput = GetJetInput();
-            if (anchoredInput.sqrMagnitude > 0.01f)
+            Vector2 jetInput = GetJetInput();
+
+            // 仅左右输入有效：左=逆时针，右=顺时针
+            float moveDir = 0f;
+            if (jetInput.x > 0.01f) moveDir = -1f;
+            else if (jetInput.x < -0.01f) moveDir = 1f;
+
+            if (Mathf.Abs(moveDir) > 0.01f)
             {
-                rb.AddForce(anchoredInput.normalized * jetForce, ForceMode2D.Force);
+                float angularSpeed = jetForce / anchorMoveRadius;
+                surfaceAngle += moveDir * angularSpeed * Time.fixedDeltaTime;
                 IsJetting = true;
             }
             else
@@ -163,21 +173,18 @@ public class PlayerController : MonoBehaviour
                 IsJetting = false;
             }
 
-            rb.velocity = Vector2.ClampMagnitude(rb.velocity, maxSpeed);
+            // 固定在球表面
+            Vector2 center = anchoredAt.transform.position;
+            Vector2 outward = new Vector2(Mathf.Cos(surfaceAngle), Mathf.Sin(surfaceAngle));
+            Vector2 targetPos = center + outward * anchorMoveRadius;
 
-            // 边界约束：超出 moveRadius → 软弹回
-            Vector3 toCenter = transform.position - anchoredAt.transform.position;
-            float dist = toCenter.magnitude;
-            if (dist > anchorMoveRadius && dist > 0.001f)
-            {
-                Vector2 normal = ((Vector2)toCenter).normalized;
-                transform.position = (Vector2)anchoredAt.transform.position + normal * anchorMoveRadius;
+            rb.MovePosition(targetPos);
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
 
-                // 反弹：去掉向外的速度分量
-                float outward = Vector2.Dot(rb.velocity, normal);
-                if (outward > 0f)
-                    rb.velocity -= normal * outward * 1.5f;
-            }
+            // ★ 旋转：头朝外（远离球心），脚朝球心。用 MoveRotation 丝滑
+            float targetAngle = Mathf.Atan2(outward.y, outward.x) * Mathf.Rad2Deg - 90f;
+            rb.MoveRotation(targetAngle);
 
             return;
         }
@@ -210,14 +217,14 @@ public class PlayerController : MonoBehaviour
         if (playerIndex == 0)
         {
             if (Input.GetKey(KeyCode.W)) v.y += 1;
-            if (Input.GetKey(KeyCode.S)) v.y -= 1;
+            // ★ 喷气背包无法向下移动
             if (Input.GetKey(KeyCode.A)) v.x -= 1;
             if (Input.GetKey(KeyCode.D)) v.x += 1;
         }
         else
         {
             if (Input.GetKey(KeyCode.UpArrow))    v.y += 1;
-            if (Input.GetKey(KeyCode.DownArrow))  v.y -= 1;
+            // ★ 喷气背包无法向下移动
             if (Input.GetKey(KeyCode.LeftArrow))  v.x -= 1;
             if (Input.GetKey(KeyCode.RightArrow)) v.x += 1;
         }
@@ -227,7 +234,7 @@ public class PlayerController : MonoBehaviour
 
     // ---- Module 4: 锚点吸附（切换行为）----
 
-    /// <summary>锚点调用：平滑飞到锚点中心，之后可在区域内自由移动</summary>
+    /// <summary>锚点调用：平滑飞到球表面最近点，之后在球表面切向移动</summary>
     public void AttachToAnchor(AnchorPoint anchor, float speed)
     {
         if (!isAnchored && !isFlyingToAnchor)
@@ -239,6 +246,10 @@ public class PlayerController : MonoBehaviour
     {
         isAnchored = false;
         anchoredAt = null;
+
+        // ★ 脱离后重新锁定 Z 旋转，恢复自由飞行姿态
+        if (rb != null)
+            rb.constraints |= RigidbodyConstraints2D.FreezeRotation;
     }
 
     /// <summary>是否已被锚点吸附</summary>
@@ -252,7 +263,15 @@ public class PlayerController : MonoBehaviour
 
     System.Collections.IEnumerator AttachRoutine(AnchorPoint anchor, float speed)
     {
-        Vector3 target = anchor.transform.position;
+        float radius = anchor.moveRadius;
+
+        // ★ 目标：球表面最近点（而非球心），避免到达后瞬移
+        Vector3 toPlayer = transform.position - anchor.transform.position;
+        Vector3 target;
+        if (toPlayer.magnitude > 0.001f)
+            target = anchor.transform.position + toPlayer.normalized * radius;
+        else
+            target = anchor.transform.position + Vector3.right * radius;
 
         // ★ 飞行阶段：不处理物理，协程驱动位置
         isFlyingToAnchor = true;
@@ -273,13 +292,21 @@ public class PlayerController : MonoBehaviour
             yield return null;
         }
 
-        // ★ 到达后进入区域移动模式
+        // ★ 到达后进入星球表面移动模式
         if (rb != null) rb.MovePosition(target);
         else transform.position = target;
         if (rb != null) rb.velocity = Vector2.zero;
 
         anchoredAt = anchor;
-        anchorMoveRadius = anchor.moveRadius;
+        anchorMoveRadius = radius;
+
+        // ★ 初始化表面角度：根据玩家在球表面的位置计算
+        Vector3 dirFromCenter = transform.position - anchor.transform.position;
+        surfaceAngle = Mathf.Atan2(dirFromCenter.y, dirFromCenter.x);
+
+        // ★ 不锁 Z 轴：允许玩家随表面旋转自由翻转
+        if (rb != null)
+            rb.constraints &= ~RigidbodyConstraints2D.FreezeRotation;
 
         isFlyingToAnchor = false;
         isAnchored = true;

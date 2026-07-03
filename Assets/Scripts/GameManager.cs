@@ -62,11 +62,11 @@ public class GameManager : MonoBehaviour
     {
         if (resetting) return;
 
-        // 掉落死亡
-        if (player1 != null && player1.transform.position.y < deathY)
-            ResetLevel();
-        if (player2 != null && player2.transform.position.y < deathY)
-            ResetLevel();
+        // ★ 暂时取消掉落死亡
+        // if (player1 != null && player1.transform.position.y < deathY)
+        //     ResetLevel();
+        // if (player2 != null && player2.transform.position.y < deathY)
+        //     ResetLevel();
     }
 
     /// <summary>终点 Trigger 调用。playerIndex: 0=P1, 1=P2</summary>

@@ -33,11 +33,24 @@ public class AnchorPoint : MonoBehaviour
 
     void Awake()
     {
-        // 没手动设 moveRadius → 自动读 CircleCollider2D.radius
+        // 没手动设 moveRadius → 自动读非 trigger 的 CircleCollider2D（星球本体大小）
         if (moveRadius <= 0f)
         {
-            var col = GetComponent<CircleCollider2D>();
-            if (col != null) moveRadius = col.radius * Mathf.Max(transform.localScale.x, transform.localScale.y);
+            var cols = GetComponents<CircleCollider2D>();
+            foreach (var col in cols)
+            {
+                if (!col.isTrigger)
+                {
+                    moveRadius = col.radius * Mathf.Max(transform.localScale.x, transform.localScale.y);
+                    break;
+                }
+            }
+            // 回退：所有 collider 都是 trigger → 读第一个
+            if (moveRadius <= 0f)
+            {
+                var col = GetComponent<CircleCollider2D>();
+                if (col != null) moveRadius = col.radius * Mathf.Max(transform.localScale.x, transform.localScale.y);
+            }
         }
     }
 
@@ -49,14 +62,18 @@ public class AnchorPoint : MonoBehaviour
 
     void OnTriggerEnter2D(Collider2D other)
     {
-        var pc = other.GetComponent<PlayerController>();
+        // ★ 用 GetComponentInParent，适配 Collider 在子物体上的情况
+        var pc = other.GetComponentInParent<PlayerController>();
         if (pc != null && !playersInRange.Contains(pc))
+        {
             playersInRange.Add(pc);
+            Debug.Log($"[AnchorPoint] {pc.name} 进入吸附范围");
+        }
     }
 
     void OnTriggerExit2D(Collider2D other)
     {
-        var pc = other.GetComponent<PlayerController>();
+        var pc = other.GetComponentInParent<PlayerController>();
         if (pc != null)
             playersInRange.Remove(pc);
     }
