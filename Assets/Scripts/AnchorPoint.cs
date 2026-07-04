@@ -263,8 +263,9 @@ public class AnchorPoint : MonoBehaviour
             }
             float frac = segLen > 0.0001f ? Mathf.Clamp01((t - baseT) / segLen) : 0f;
             Vector2 local = Vector2.Lerp(sampledPoints[idx], sampledPoints[next], frac);
-            Vector2 normal = GetSurfaceNormal(t); // 直接用边几何法线，一致
-            return (Vector2)transform.position + local + normal * outwardOffset;
+            // ★ 用锚点中心→表面方向做外移（平滑过角落），避免边法线跳变导致位置瞬移
+            Vector2 outwardDir = local.normalized;
+            return (Vector2)transform.position + local + outwardDir * outwardOffset;
         }
         else
         {

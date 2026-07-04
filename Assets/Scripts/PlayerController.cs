@@ -125,8 +125,8 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        // 对话中禁用所有输入
-        if (DialogueManager.IsActive) return;
+        // 初始化/对话中禁用所有输入
+        if (GameManager.IsInitializing || DialogueManager.IsActive) return;
 
         // ★ 瞬时喷气：在 Update 捕获 GetKeyDown，避免 FixedUpdate 丢帧
         pendingJetImpulse += GetJetInputDown();
@@ -153,8 +153,8 @@ public class PlayerController : MonoBehaviour
 
     void FixedUpdate()
     {
-        // 对话中禁用所有物理移动
-        if (DialogueManager.IsActive)
+        // 初始化/对话中禁用所有物理移动
+        if (GameManager.IsInitializing || DialogueManager.IsActive)
         {
             IsJetting = false;
             return;
@@ -367,7 +367,7 @@ public class PlayerController : MonoBehaviour
 
     // ---- 碰碰车弹开（碰撞体检测）----
 
-    void OnCollisionStay2D(Collision2D collision)
+    void OnCollisionEnter2D(Collision2D collision)
     {
         if (!isAnchored) return;
 

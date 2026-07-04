@@ -47,7 +47,6 @@ public class RopeController : MonoBehaviour
     float lastCursorLength;
 
     // 调参脏标记：避免每帧 ChangeLength（增删粒子是重操作）
-    float lastAppliedStretchStiffness = -1f;
     float lastAppliedBendingStiffness = -1f;
     float lastAppliedTearResistance = -1f;
 
@@ -87,8 +86,11 @@ public class RopeController : MonoBehaviour
         if (solver != null)
         {
             solver.parameters.gravity = Vector4.zero;
+            // ★ 高迭代保稳：刚度 1.0 需要足够迭代次数才能收敛，避免中间粒子乱跳
+            solver.distanceConstraintParameters.iterations = 40;
+            solver.bendingConstraintParameters.iterations = 20;
             solver.UpdateParameters(); // ← 关键：推到 Obi 原生库，否则改 struct 不生效
-            Debug.Log("[RopeController] Obi solver 重力已归零");
+            Debug.Log("[RopeController] Obi solver 重力归零, 距离迭代=40, 弯曲迭代=20");
         }
 
         // 太空零重力 → 绳子不该有任何弯曲/下坠，刚度拉满让它始终笔直
@@ -96,21 +98,40 @@ public class RopeController : MonoBehaviour
         rope.DistanceConstraints.stiffness = 1f;
         Debug.Log("[RopeController] 绳索弯曲/拉伸刚度已设为 1.0（太空绷直线）");
 
-        // === Pin 约束：粒子 0 → P1，粒子 N → P2 ===
-        SetupPins();
-
-        // 缓存 Rigidbody2D 用于拉力回传
+        // ★ 缓存 Rigidbody2D（必须在 SetupPins 之前，用于冻结玩家）
         rb1 = player1Collider != null ? player1Collider.GetComponent<Rigidbody2D>() : null;
         rb2 = player2Collider != null ? player2Collider.GetComponent<Rigidbody2D>() : null;
 
-        // 初始化动态绳长：取初始绳长
-        currentRopeLength = config != null ? config.initialRopeLength : 5f;
+        // ★ 冻结玩家 → Obi pin 约束无法移动 kinematic 物体 → 绳子自己在两人之间就位
+        if (rb1 != null) rb1.isKinematic = true;
+        if (rb2 != null) rb2.isKinematic = true;
+
+        // === Pin 约束：粒子 0 → P1，粒子 N → P2 ===
+        SetupPins();
+
+        // 初始化动态绳长：取玩家间距和配置初始绳长的较大值
+        float playerDist = (rb1 != null && rb2 != null)
+            ? Vector3.Distance(rb1.transform.position, rb2.transform.position)
+            : 5f;
+        float configLen = config != null ? config.initialRopeLength : 5f;
+        currentRopeLength = Mathf.Max(playerDist, configLen);
         lastCursorLength = currentRopeLength;
+
+        // 立刻同步绳长到 Obi
+        if (cursor != null)
+            cursor.ChangeLength(currentRopeLength);
+
+        // ★ 等绳子在冻结的玩家之间自然就位（Obi 需要几帧物理步）
+        yield return new WaitForSeconds(0.2f);
+        yield return new WaitForFixedUpdate();
+
+        // ★ 解冻玩家，归零残留速度
+        if (rb1 != null) { rb1.isKinematic = false; rb1.velocity = Vector2.zero; }
+        if (rb2 != null) { rb2.isKinematic = false; rb2.velocity = Vector2.zero; }
 
         lastUsedParticles = rope.UsedParticles;
 
         // 强制触发首次参数应用
-        lastAppliedStretchStiffness = -1f;
         lastAppliedBendingStiffness = -1f;
         lastAppliedTearResistance  = -1f;
 
@@ -270,7 +291,7 @@ public class RopeController : MonoBehaviour
         {
             Vector3 dir = (p2 - p1).normalized;        // P1 → P2 方向
             float stretch = dist - currentRopeLength;
-            float force = stretch * config.stretchStiffness * 50f;
+            float force = stretch * config.stretchStiffness * 20f;
 
             bool p1Pulling = player1Ctrl != null && player1Ctrl.IsPulling;
             bool p2Pulling = player2Ctrl != null && player2Ctrl.IsPulling;
@@ -314,23 +335,7 @@ public class RopeController : MonoBehaviour
             rope.BendingConstraints.stiffness = config.bendingStiffness;
         }
 
-        // --- 拉伸刚度（影响 solver 迭代次数）---
-        if (!Mathf.Approximately(config.stretchStiffness, lastAppliedStretchStiffness))
-        {
-            lastAppliedStretchStiffness = config.stretchStiffness;
-            if (solver != null)
-            {
-                int iters = Mathf.RoundToInt(config.stretchStiffness * 10f);
-                solver.distanceConstraintParameters.iterations = Mathf.Max(1, iters);
-            }
-        }
-
-        // --- 弯曲迭代次数 ---
-        if (solver != null && !Mathf.Approximately(config.bendingStiffness, lastAppliedBendingStiffness))
-        {
-            int bendIters = Mathf.RoundToInt(config.bendingStiffness * 10f);
-            solver.bendingConstraintParameters.iterations = Mathf.Max(1, bendIters);
-        }
+        // ★ 迭代次数已在 Start 硬编码（距离40/弯曲20），不再随刚度动态调整
 
         // --- 断裂 ---
         if (!Mathf.Approximately(config.tearResistance, lastAppliedTearResistance))

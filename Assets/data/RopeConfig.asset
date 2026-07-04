@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ade0593a8b07e6b43b117a4d5b5fde47, type: 3}
   m_Name: RopeConfig
   m_EditorClassIdentifier: 
-  initialRopeLength: 2.5
+  initialRopeLength: 9.33
   ropeLength: 20
   minRopeLength: 2.5
   retractionSpeed: 8

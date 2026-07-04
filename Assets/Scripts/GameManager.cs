@@ -35,6 +35,9 @@ public class GameManager : MonoBehaviour
     public int totalGoalPickups = 3;
     int collectedGoals;
 
+    [Header("暂停菜单")]
+    public PauseMenu pauseMenu;
+
     [Header("重来效果")]
     [Tooltip("全屏黑色遮罩 Image（用于淡入淡出）")]
     public Image fadeImage;
@@ -48,19 +51,49 @@ public class GameManager : MonoBehaviour
     Rigidbody2D rb1;
     Rigidbody2D rb2;
 
+    /// <summary>开局初始化中，其他脚本读这个禁用输入/物理</summary>
+    public static bool IsInitializing { get; private set; }
+
     void Start()
     {
         rb1 = player1 != null ? player1.GetComponent<Rigidbody2D>() : null;
         rb2 = player2 != null ? player2.GetComponent<Rigidbody2D>() : null;
 
-        // 确保初始 fade 透明
+        // 开局黑屏，等绳子就位后淡出
         if (fadeImage != null)
-            fadeImage.color = new Color(0, 0, 0, 0);
+            fadeImage.color = Color.black;
+
+        StartCoroutine(InitSequence());
+    }
+
+    System.Collections.IEnumerator InitSequence()
+    {
+        IsInitializing = true;
+
+        // 等 RopeController.Start 跑完（生成粒子→冻结玩家→Pin→0.2s settle→解冻）
+        yield return new WaitForSeconds(0.5f);
+
+        // 多等一帧让 solver 稳定
+        yield return new WaitForFixedUpdate();
+
+        IsInitializing = false;
+
+        if (fadeImage != null)
+            yield return fadeImage.DOFade(0f, fadeDuration).WaitForCompletion();
     }
 
     void Update()
     {
         if (resetting) return;
+
+        // ESC 暂停菜单
+        if (Input.GetKeyDown(KeyCode.Escape) && pauseMenu != null)
+        {
+            if (pauseMenu.gameObject.activeSelf)
+                pauseMenu.Close();
+            else
+                pauseMenu.Open();
+        }
 
         // ★ 暂时取消掉落死亡
         // if (player1 != null && player1.transform.position.y < deathY)
