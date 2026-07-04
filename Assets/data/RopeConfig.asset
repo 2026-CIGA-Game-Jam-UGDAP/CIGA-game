@@ -17,6 +17,6 @@ MonoBehaviour:
   minRopeLength: 2.5
   retractionSpeed: 8
   thickness: 0.07
-  stretchStiffness: 1
-  bendingStiffness: 1
+  stretchStiffness: 0.693
+  bendingStiffness: 0.653
   tearResistance: 999

@@ -90,6 +90,7 @@ public class PlayerController : MonoBehaviour
 
     Rigidbody2D rb;
     SpriteRenderer spriteRenderer;
+    Animator animator;
     bool isAnchored;
     bool isFlyingToAnchor;
     AnchorPoint anchoredAt;
@@ -102,6 +103,7 @@ public class PlayerController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+        animator = GetComponent<Animator>();
 
         if (rb != null)
         {
@@ -149,6 +151,8 @@ public class PlayerController : MonoBehaviour
 
         // ★ 收绳：暴露给 RopeController 读
         IsPulling = Input.GetKey(playerIndex == 0 ? P1_PullRope : P2_PullRope);
+
+        UpdateAnimator();
     }
 
     void FixedUpdate()
@@ -231,6 +235,19 @@ public class PlayerController : MonoBehaviour
         IsJetting = jetting;
 
         // ★ 不再硬限速：jetForce 决定每次推力，linearDrag 自然限速。调 jetForce 直观可感
+    }
+
+    void UpdateAnimator()
+    {
+        if (animator == null) return;
+
+        bool grounded = isAnchored;
+        bool landing = isFlyingToAnchor;
+        bool flying = !isAnchored && !isFlyingToAnchor;
+
+        animator.SetBool("IsGrounded", grounded);
+        animator.SetBool("IsLanding", landing);
+        animator.SetBool("IsFlying", flying);
     }
 
     // ---- 输入 (Module 2: 四方向喷气) ----

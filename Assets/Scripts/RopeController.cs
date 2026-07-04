@@ -45,6 +45,7 @@ public class RopeController : MonoBehaviour
     // 运行时动态绳长
     float currentRopeLength;
     float lastCursorLength;
+    float changeLengthCooldown; // ChangeLength 冷却计时器，避免频繁增删粒子→瞬态力
 
     // 调参脏标记：避免每帧 ChangeLength（增删粒子是重操作）
     float lastAppliedBendingStiffness = -1f;
@@ -87,10 +88,11 @@ public class RopeController : MonoBehaviour
         {
             solver.parameters.gravity = Vector4.zero;
             // ★ 高迭代保稳：刚度 1.0 需要足够迭代次数才能收敛，避免中间粒子乱跳
-            solver.distanceConstraintParameters.iterations = 40;
-            solver.bendingConstraintParameters.iterations = 20;
-            solver.UpdateParameters(); // ← 关键：推到 Obi 原生库，否则改 struct 不生效
-            Debug.Log("[RopeController] Obi solver 重力归零, 距离迭代=40, 弯曲迭代=20");
+            // ★ 迭代不宜过高：刚度 1.0 + 过高迭代 → 数值振荡 → 玩家被微力推着漂
+            solver.distanceConstraintParameters.iterations = 10;
+            solver.bendingConstraintParameters.iterations = 5;
+            solver.UpdateParameters();
+            Debug.Log("[RopeController] Obi solver 重力归零, 距离迭代=10, 弯曲迭代=5");
         }
 
         // 太空零重力 → 绳子不该有任何弯曲/下坠，刚度拉满让它始终笔直
@@ -109,15 +111,14 @@ public class RopeController : MonoBehaviour
         // === Pin 约束：粒子 0 → P1，粒子 N → P2 ===
         SetupPins();
 
-        // 初始化动态绳长：取玩家间距和配置初始绳长的较大值
+        // 初始化动态绳长：精确匹配玩家间距（不能比间距长，否则绳子被压缩→推玩家）
         float playerDist = (rb1 != null && rb2 != null)
             ? Vector3.Distance(rb1.transform.position, rb2.transform.position)
             : 5f;
-        float configLen = config != null ? config.initialRopeLength : 5f;
-        currentRopeLength = Mathf.Max(playerDist, configLen);
+        currentRopeLength = playerDist;
         lastCursorLength = currentRopeLength;
 
-        // 立刻同步绳长到 Obi
+        // 同步绳长到 Obi（之后不再频繁调用 ChangeLength）
         if (cursor != null)
             cursor.ChangeLength(currentRopeLength);
 
@@ -235,7 +236,7 @@ public class RopeController : MonoBehaviour
     }
 
     /// <summary>
-    /// 动态绳长：收绳（按住Q收短）+ 放绳（玩家走远自动伸长）。
+    /// 动态绳长：收绳 + 放绳 + ★ 松绳缩回（绳子永不被压缩 → 只拉不推）。
     /// </summary>
     void UpdateRopeLength()
     {
@@ -248,30 +249,42 @@ public class RopeController : MonoBehaviour
         if (player1Ctrl != null && player1Ctrl.IsPulling) pullers++;
         if (player2Ctrl != null && player2Ctrl.IsPulling) pullers++;
 
+        float dist = 0f;
+        bool haveDist = rb1 != null && rb2 != null;
+        if (haveDist)
+            dist = Vector3.Distance(rb1.transform.position, rb2.transform.position);
+
         if (pullers > 0)
         {
-            // 收绳：减少绳长
+            // 收绳：减少绳长（拉人）
             currentRopeLength -= config.retractionSpeed * pullers * Time.deltaTime;
             if (currentRopeLength < minLen) currentRopeLength = minLen;
         }
-        else
+        else if (haveDist && dist > currentRopeLength)
         {
-            // 放绳：玩家间距 > 当前绳长 → 自动伸长（瞬间，上限 maxLen）
-            if (rb1 != null && rb2 != null)
-            {
-                float dist = Vector3.Distance(rb1.transform.position, rb2.transform.position);
-                if (dist > currentRopeLength)
-                {
-                    currentRopeLength = Mathf.Min(dist, maxLen);
-                }
-            }
+            // 放绳：玩家间距 > 绳长 → 渐进伸长
+            float expandSpeed = config.retractionSpeed * 1.5f;
+            currentRopeLength += expandSpeed * Time.deltaTime;
+            if (currentRopeLength > dist) currentRopeLength = dist;
+            if (currentRopeLength > maxLen) currentRopeLength = maxLen;
+        }
+        else if (haveDist && dist < currentRopeLength)
+        {
+            // ★ 松绳缩回：玩家靠近了 → 缩短绳长匹配间距 → 绳子永不被压缩！
+            float shrinkSpeed = config.retractionSpeed * 2f; // 缩回比放出快
+            currentRopeLength -= shrinkSpeed * Time.deltaTime;
+            if (currentRopeLength < dist) currentRopeLength = dist;
+            if (currentRopeLength < minLen) currentRopeLength = minLen;
         }
 
-        // 同步到 Obi rope cursor（只在变化足够大时才操作，增删粒子是重操作）
-        if (cursor != null && Mathf.Abs(currentRopeLength - lastCursorLength) > 0.1f)
+        // ★ ChangeLength 冷却：最多每秒 5 次，避免频繁增删粒子→瞬态力推玩家
+        changeLengthCooldown -= Time.deltaTime;
+        if (cursor != null && changeLengthCooldown <= 0f
+            && Mathf.Abs(currentRopeLength - lastCursorLength) > 0.3f)
         {
             cursor.ChangeLength(currentRopeLength);
             lastCursorLength = currentRopeLength;
+            changeLengthCooldown = 0.2f;
         }
     }
 
@@ -312,6 +325,40 @@ public class RopeController : MonoBehaviour
                 // 都没收或都在收 → 双向弹簧（保持现有逻辑）
                 rb1.AddForce(dir * force, ForceMode2D.Force);
                 rb2.AddForce(-dir * force, ForceMode2D.Force);
+            }
+        }
+    }
+
+    /// <summary>
+    /// ★ 强制同步 pinned 粒子到玩家位置，消除 Obi solver 对 MovePosition 的 1-2 帧延迟。
+    /// 表面行走用 rb.MovePosition（瞬移），Obi solver 在 FixedUpdate 求解后，
+    /// 相邻粒子需要多个迭代才能追上瞬移量 → 绳端产生甩动/拉长闪烁。
+    /// 这里在渲染前直接矫正端粒子位置，绕过 solver 延迟。
+    /// </summary>
+    void LateUpdate()
+    {
+        if (rope == null || !rope.Initialized || ropeBroken) return;
+
+        var pos = rope.positions;
+        var vel = rope.velocities;
+
+        // 粒子 0 → Player1
+        if (player1Collider != null && pos.Length > 0)
+        {
+            Vector3 target = player1Collider.transform.position + pinOffset;
+            pos[0] = rope.transform.InverseTransformPoint(target);
+            if (vel.Length > 0) vel[0] = Vector3.zero;
+        }
+
+        // 粒子 N → Player2
+        if (player2Collider != null && pos.Length > 1)
+        {
+            int idx = rope.UsedParticles - 1;
+            if (idx < pos.Length)
+            {
+                Vector3 target = player2Collider.transform.position + pinOffset;
+                pos[idx] = rope.transform.InverseTransformPoint(target);
+                if (vel.Length > idx) vel[idx] = Vector3.zero;
             }
         }
     }
