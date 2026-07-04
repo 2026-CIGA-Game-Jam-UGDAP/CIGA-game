@@ -2,6 +2,7 @@ using UnityEngine;
 using System.Collections;
 using DG.Tweening;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
 using Obi;
 
 /// <summary>
@@ -135,7 +136,7 @@ public class GameManager : MonoBehaviour
         //     ResetLevel();
     }
 
-    void ResetLevel()
+    public void ResetLevel()
     {
         if (resetting) return;
         resetting = true;
@@ -205,6 +206,19 @@ public class GameManager : MonoBehaviour
             yield return fadeImage.DOFade(0f, fadeDuration).WaitForCompletion();
 
         resetting = false;
+    }
+
+    /// <summary>完全重开：延迟一帧让 UI 事件退出，再重载场景</summary>
+    public void RestartGame()
+    {
+        StartCoroutine(DoRestart());
+    }
+
+    IEnumerator DoRestart()
+    {
+        // 等帧末退出 UI 事件上下文，让 Obi 自然销毁
+        yield return new WaitForEndOfFrame();
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     void Victory()

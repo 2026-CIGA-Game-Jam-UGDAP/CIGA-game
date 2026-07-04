@@ -15,7 +15,6 @@ public class PlayerController : MonoBehaviour
     public const KeyCode P1_JetLeft    = KeyCode.A;
     public const KeyCode P1_JetRight   = KeyCode.D;
     public const KeyCode P1_Transfer   = KeyCode.E;
-    public const KeyCode P1_PullRope   = KeyCode.Q;
     public const KeyCode P1_Snap       = KeyCode.LeftShift;
 
     // P2
@@ -23,7 +22,6 @@ public class PlayerController : MonoBehaviour
     public const KeyCode P2_JetLeft    = KeyCode.LeftArrow;
     public const KeyCode P2_JetRight   = KeyCode.RightArrow;
     public const KeyCode P2_Transfer   = KeyCode.Keypad0;
-    public const KeyCode P2_PullRope   = KeyCode.RightControl;
     public const KeyCode P2_Snap       = KeyCode.Return;
 
     // 通用
@@ -78,9 +76,6 @@ public class PlayerController : MonoBehaviour
     /// <summary>当前这次按住已传输的段数（松手清零）</summary>
     float transferredThisHold;
 
-    /// <summary>是否正在按收绳键（给 RopeController 读）</summary>
-    public bool IsPulling { get; private set; }
-
     [Header("TA 效果")]
     [Tooltip("摄像机抖动组件引用")]
     [SerializeField] CameraShake cameraShake;
@@ -98,7 +93,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] ParticleSystem landDust;
 
     Rigidbody2D rb;
-    SpriteRenderer spriteRenderer;
     Animator animator;
     bool isAnchored;
     bool isFlyingToAnchor;
@@ -111,7 +105,6 @@ public class PlayerController : MonoBehaviour
     void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
-        spriteRenderer = GetComponentInChildren<SpriteRenderer>();
         animator = GetComponent<Animator>();
 
         if (rb != null)
@@ -129,9 +122,6 @@ public class PlayerController : MonoBehaviour
         currentEnergy = maxEnergy;
 
         spawnBounce?.Play();
-
-        Color[] colors = { Color.cyan, Color.red };
-        ApplyColor(colors[Mathf.Clamp(playerIndex, 0, colors.Length - 1)]);
     }
 
     void Update()
@@ -172,9 +162,6 @@ public class PlayerController : MonoBehaviour
         // 松手重置传输计数
         if (!holdingTransfer)
             transferredThisHold = 0f;
-
-        // ★ 收绳：暴露给 RopeController 读
-        IsPulling = Input.GetKey(playerIndex == 0 ? P1_PullRope : P2_PullRope);
 
         UpdateAnimator();
     }
@@ -265,9 +252,20 @@ public class PlayerController : MonoBehaviour
         bool landing = isFlyingToAnchor;
         bool flying = !isAnchored && !isFlyingToAnchor;
 
+        // 在星球表面左右移动时播放 walk 动画
+        bool walking = false;
+        if (grounded)
+        {
+            if (playerIndex == 0)
+                walking = Input.GetKey(P1_JetLeft) || Input.GetKey(P1_JetRight);
+            else
+                walking = Input.GetKey(P2_JetLeft) || Input.GetKey(P2_JetRight);
+        }
+
         animator.SetBool("IsGrounded", grounded);
         animator.SetBool("IsLanding", landing);
         animator.SetBool("IsFlying", flying);
+        animator.SetBool("IsWalking", walking);
     }
 
     // ---- 输入 (Module 2: 四方向喷气) ----
@@ -318,9 +316,12 @@ public class PlayerController : MonoBehaviour
         isAnchored = false;
         anchoredAt = null;
 
-        // ★ 脱离后重新锁定 Z 旋转，恢复自由飞行姿态
+        // ★ 脱离后重置旋转为 0，重新锁定 Z 旋转，恢复自由飞行姿态
         if (rb != null)
+        {
+            rb.MoveRotation(0f);
             rb.constraints |= RigidbodyConstraints2D.FreezeRotation;
+        }
     }
 
     /// <summary>是否已被锚点吸附</summary>
@@ -429,14 +430,6 @@ public class PlayerController : MonoBehaviour
 
         spriteFlash?.Flash();
         cameraShake?.Shake(0.3f);
-    }
-
-    // ---- 外观 ----
-
-    void ApplyColor(Color c)
-    {
-        if (spriteRenderer != null)
-            spriteRenderer.color = c;
     }
 
     // ---- TA 效果（保留接口，直接调用）----

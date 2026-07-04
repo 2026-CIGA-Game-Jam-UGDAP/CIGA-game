@@ -14,8 +14,6 @@ public class AnchorPoint : MonoBehaviour
     [SerializeField] float snapSpeed = 12f;
     [Tooltip("吸附后玩家可移动半径。0=自动读取 Collider")]
     public float moveRadius = 0f;
-    [Tooltip("表面向外偏移量（避免玩家碰撞体与实体 collider 重叠）")]
-    [SerializeField] float outwardOffset = 0.35f;
 
     [Header("视觉提示（可选）")]
     [Tooltip("锚点指示器 SpriteRenderer，显示锚点状态颜色")]
@@ -265,13 +263,13 @@ public class AnchorPoint : MonoBehaviour
             Vector2 local = Vector2.Lerp(sampledPoints[idx], sampledPoints[next], frac);
             // ★ 用锚点中心→表面方向做外移（平滑过角落），避免边法线跳变导致位置瞬移
             Vector2 outwardDir = local.normalized;
-            return (Vector2)transform.position + local + outwardDir * outwardOffset;
+            return (Vector2)transform.position + local;
         }
         else
         {
             float angle = t / moveRadius;
             Vector2 outward = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle));
-            return (Vector2)transform.position + outward * (moveRadius + outwardOffset);
+            return (Vector2)transform.position + outward * moveRadius;
         }
     }
 

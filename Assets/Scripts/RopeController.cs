@@ -27,12 +27,6 @@ public class RopeController : MonoBehaviour
     [Tooltip("Pin 约束偏移。调 Y 值把绳从脚底提到角色中心")]
     public Vector3 pinOffset = Vector3.zero;
 
-    [Header("玩家控制器")]
-    [Tooltip("玩家 1 的 PlayerController，用于读 IsPulling")]
-    public PlayerController player1Ctrl;
-    [Tooltip("玩家 2 的 PlayerController，用于读 IsPulling")]
-    public PlayerController player2Ctrl;
-
     [Header("配置")]
     [Tooltip("绳索物理参数配置（RopeConfig 资产）")]
     public RopeConfig config;

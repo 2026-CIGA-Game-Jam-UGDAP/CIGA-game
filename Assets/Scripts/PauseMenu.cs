@@ -13,6 +13,7 @@ public class PauseMenu : MonoBehaviour
     public CanvasGroup overlayGroup;
     public RectTransform menuBox;
     public Button btnResume;
+    public Button btnRestart;
     public Button btnLobby;
     public Button btnQuit;
 
@@ -21,6 +22,7 @@ public class PauseMenu : MonoBehaviour
     void Awake()
     {
         btnResume.onClick.AddListener(Close);
+        btnRestart.onClick.AddListener(Restart);
         btnLobby.onClick.AddListener(GoToLobby);
         btnQuit.onClick.AddListener(QuitGame);
     }
@@ -59,6 +61,16 @@ public class PauseMenu : MonoBehaviour
             .OnComplete(() => gameObject.SetActive(false));
 
         Time.timeScale = 1f;
+    }
+
+    void Restart()
+    {
+        Time.timeScale = 1f;
+        isOpen = false;
+        gameObject.SetActive(false);
+        var gm = FindFirstObjectByType<GameManager>();
+        if (gm != null)
+            gm.RestartGame();
     }
 
     void GoToLobby()
