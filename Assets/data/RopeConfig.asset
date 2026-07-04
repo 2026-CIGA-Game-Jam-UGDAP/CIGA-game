@@ -11,7 +11,9 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: ade0593a8b07e6b43b117a4d5b5fde47, type: 3}
   m_Name: RopeConfig
-  m_EditorClassIdentifier: 
-  stretchStiffness: 0.4
-  bendingStiffness: 0.653
+  m_EditorClassIdentifier:
+  ropeLength: 10
+  thickness: 0.07
+  stretchStiffness: 0.329
+  bendingStiffness: 0.438
   tearResistance: 999

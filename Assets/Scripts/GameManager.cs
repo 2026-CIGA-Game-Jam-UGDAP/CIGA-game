@@ -3,7 +3,6 @@ using System.Collections;
 using DG.Tweening;
 using UnityEngine.UI;
 using UnityEngine.SceneManagement;
-using Obi;
 
 /// <summary>
 /// 游戏流程管理：检测过关、掉落重来、绳索断裂。
@@ -75,17 +74,11 @@ public class GameManager : MonoBehaviour
     bool resetting;
     bool shipAnimating;
 
-    Rigidbody2D rb1;
-    Rigidbody2D rb2;
-
     /// <summary>开局初始化中，其他脚本读这个禁用输入/物理</summary>
     public static bool IsInitializing { get; private set; }
 
     void Start()
     {
-        rb1 = player1 != null ? player1.GetComponent<Rigidbody2D>() : null;
-        rb2 = player2 != null ? player2.GetComponent<Rigidbody2D>() : null;
-
         // 初始化 HUD
         if (partHUD != null)
             partHUD.SetDisplayQuiet(0, totalGoalPickups);
@@ -190,64 +183,9 @@ public class GameManager : MonoBehaviour
         if (fadeImage != null)
             yield return fadeImage.DOFade(1f, fadeDuration).WaitForCompletion();
 
-        // 2. 禁用绳索 + 等 solver 停稳
-        ObiRope rope = ropeController != null ? ropeController.rope : null;
-        if (rope != null && spawnPoint1 != null && spawnPoint2 != null)
-        {
-            rope.enabled = false;
-            yield return new WaitForFixedUpdate();
-
-            // 3. 把绳 transform 对齐到出生点
-            rope.transform.position = spawnPoint1.position;
-            Vector3 dir = (spawnPoint2.position - spawnPoint1.position).normalized;
-            if (dir != Vector3.zero)
-                rope.transform.right = dir;
-
-            // 4. 直接改每个粒子的本地位置：插值分布在两出生点之间
-            int count = rope.UsedParticles;
-            Vector3[] localPositions = rope.positions;
-            for (int i = 0; i < count && i < localPositions.Length; i++)
-            {
-                float t = count > 1 ? (float)i / (count - 1) : 0f;
-                Vector3 worldPos = Vector3.Lerp(spawnPoint1.position, spawnPoint2.position, t);
-                localPositions[i] = rope.transform.InverseTransformPoint(worldPos);
-            }
-
-            // 5. 清零粒子速度
-            for (int i = 0; i < rope.velocities.Length; i++)
-                rope.velocities[i] = Vector3.zero;
-            for (int i = 0; i < rope.angularVelocities.Length; i++)
-                rope.angularVelocities[i] = Vector3.zero;
-
-            // ★ 等 solver 用新 transform + 新本地位置刷新粒子世界位置
-            yield return new WaitForFixedUpdate();
-        }
-
-        // 6. 瞬移玩家 + 归零速度
-        if (player1 != null && spawnPoint1 != null)
-            player1.transform.position = spawnPoint1.position;
-        if (player2 != null && spawnPoint2 != null)
-            player2.transform.position = spawnPoint2.position;
-        if (rb1 != null) rb1.velocity = Vector2.zero;
-        if (rb2 != null) rb2.velocity = Vector2.zero;
-
-        shipAnimating = false;
-        collectedGoals = 0;
-        if (partHUD != null)
-            partHUD.SetDisplayQuiet(0, totalGoalPickups);
-
-        // 7. 重新启用绳索
-        if (rope != null)
-        {
-            rope.enabled = true;
-            ropeController.ResetRope();
-        }
-
-        // 8. 黑屏淡出
-        if (fadeImage != null)
-            yield return fadeImage.DOFade(0f, fadeDuration).WaitForCompletion();
-
-        resetting = false;
+        // 2. 完全重载场景：销毁所有对象，Obi + 物理从零初始化
+        //    Start() → InitSequence() 会自然处理黑屏→绳子就位→淡出
+        SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     /// <summary>完全重开：延迟一帧让 UI 事件退出，再重载场景</summary>

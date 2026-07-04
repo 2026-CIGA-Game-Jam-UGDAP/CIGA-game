@@ -224,8 +224,6 @@ public class PlayerController : MonoBehaviour
             // ★ 用锚点的方向符号：+1 表示 t 增加 = 右（顺时针），-1 表示需要反转
             float moveDir = rawHorizontal * AnchorMoveSign;
 
-            Vector2 currentPos = AnchorSurfacePoint(surfaceT);
-
             if (Mathf.Abs(moveDir) > 0.01f)
             {
                 surfaceT += moveDir * moveSpeed * Time.fixedDeltaTime;
@@ -237,26 +235,6 @@ public class PlayerController : MonoBehaviour
             }
 
             Vector2 targetPos = AnchorSurfacePoint(surfaceT);
-
-            // ★ 绳子约束：只在移动远离队友时限制，同向走不限制
-            if (ropeController != null && otherPlayer != null)
-            {
-                float ropeLen = ropeController.FixedRopeLength;
-                if (ropeLen > 0f)
-                {
-                    Vector2 otherPos = otherPlayer.transform.position;
-                    float curDist = Vector2.Distance(currentPos, otherPos);
-                    float newDist = Vector2.Distance(targetPos, otherPos);
-                    // 只有拉大距离且超出绳长时才 clamp（同向走不会拉大距离）
-                    if (newDist > ropeLen && newDist > curDist)
-                    {
-                        Vector2 dir = (targetPos - otherPos).normalized;
-                        Vector2 clampedPos = otherPos + dir * ropeLen;
-                        surfaceT = AnchorClosestT(clampedPos);
-                        targetPos = AnchorSurfacePoint(surfaceT);
-                    }
-                }
-            }
 
             Vector2 normal = AnchorSurfaceNormal(surfaceT);
             float targetAngle = Mathf.Atan2(normal.y, normal.x) * Mathf.Rad2Deg - 90f;

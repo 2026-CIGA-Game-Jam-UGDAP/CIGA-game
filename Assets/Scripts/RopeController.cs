@@ -18,6 +18,8 @@ public class RopeController : MonoBehaviour
     public ObiRope rope;
     [Tooltip("场景中的 ObiSolver 组件")]
     public ObiSolver solver;
+    [Tooltip("场景中的 ObiRopeCursor 组件")]
+    public ObiRopeCursor cursor;
 
     [Header("玩家（需要有 ObiCollider 组件）")]
     [Tooltip("玩家 1 的 ObiCollider（ObiCollider 或 ObiCollider2D）")]
@@ -30,9 +32,6 @@ public class RopeController : MonoBehaviour
     [Header("配置")]
     [Tooltip("绳索物理参数配置（RopeConfig 资产）")]
     public RopeConfig config;
-    [Tooltip("绳长倍率：1=Obi 实际长度，>1 更松，<1 更紧")]
-    [Range(0.5f, 3f)]
-    public float ropeLengthMultiplier = 1f;
 
     [Header("事件")]
     [Tooltip("GameManager 引用，断裂时回调 OnRopeBreak()")]
@@ -46,13 +45,9 @@ public class RopeController : MonoBehaviour
     [Tooltip("传输颜色动画时长")]
     public float transferColorDuration = 0.3f;
 
-    // ★ 定长绳长：Start 初始化后不再改变
-    float fixedRopeLength;
-
-    /// <summary>定长绳长（Start 初始化后不再改变），供 PlayerController 做吸附移动约束</summary>
-    public float FixedRopeLength => fixedRopeLength;
-
-    // 调参脏标记
+    // 调参脏标记：避免每帧 ChangeLength（增删粒子是重操作）
+    float lastAppliedLength = -1f;
+    float lastAppliedStretchStiffness = -1f;
     float lastAppliedBendingStiffness = -1f;
     float lastAppliedTearResistance = -1f;
 
@@ -71,6 +66,7 @@ public class RopeController : MonoBehaviour
     {
         if (rope == null)   rope = GetComponent<ObiRope>();
         if (solver == null) solver = GetComponent<ObiSolver>();
+        if (cursor == null) cursor = GetComponent<ObiRopeCursor>();
     }
 
     IEnumerator Start()
@@ -89,19 +85,14 @@ public class RopeController : MonoBehaviour
             rope.AddToSolver(null);
         }
 
-        // ★ 太空环境：零重力 + 高刚度 = 绳子不弯不坠，像一根绷紧的太空缆
+        // ★ 太空环境：零重力
         if (solver != null)
         {
             solver.parameters.gravity = Vector4.zero;
-            // ★ 高迭代保稳：刚度 1.0 需要足够迭代次数才能收敛，避免中间粒子乱跳
-            // ★ 迭代不宜过高：刚度 1.0 + 过高迭代 → 数值振荡 → 玩家被微力推着漂
-            solver.distanceConstraintParameters.iterations = 10;
-            solver.bendingConstraintParameters.iterations = 5;
-            solver.UpdateParameters();
         }
 
-        // 太空零重力 → 绳子不该有任何弯曲/下坠，刚度拉满让它始终笔直
-        rope.BendingConstraints.stiffness = 1f;
+        // ★ 初始刚度从 config 读取（软绳）
+        rope.BendingConstraints.stiffness = config != null ? config.bendingStiffness : 0.438f;
         rope.DistanceConstraints.stiffness = 1f;
 
         // ★ 缓存 Rigidbody2D（必须在 SetupPins 之前，用于冻结玩家）
@@ -115,9 +106,6 @@ public class RopeController : MonoBehaviour
         // === Pin 约束：粒子 0 → P1，粒子 N → P2 ===
         SetupPins();
 
-        // ★ 定长绳长：Obi 物理 rest length × 手动倍率
-        fixedRopeLength = (rope.RestLength > 0f ? rope.RestLength : 5f) * ropeLengthMultiplier;
-
         // ★ 等绳子在冻结的玩家之间自然就位（Obi 需要几帧物理步）
         yield return new WaitForSeconds(0.2f);
         yield return new WaitForFixedUpdate();
@@ -129,8 +117,10 @@ public class RopeController : MonoBehaviour
         lastUsedParticles = rope.UsedParticles;
 
         // 强制触发首次参数应用
+        lastAppliedLength = -1f;
+        lastAppliedStretchStiffness = -1f;
         lastAppliedBendingStiffness = -1f;
-        lastAppliedTearResistance  = -1f;
+        lastAppliedTearResistance = -1f;
 
         ApplyConfigIfChanged();
     }
@@ -224,8 +214,8 @@ public class RopeController : MonoBehaviour
     }
 
     /// <summary>
-    /// 弹簧拉力：玩家间距超过定长绳长时双向拉回。
-    /// 定长模式下无收绳/放绳，始终双向弹簧。
+    /// 弹簧拉力：玩家间距超过基准绳长时双向拉回。
+    /// 绳子不主动调 cursor 伸长——Obi pin 约束 + 距离约束自然拉伸。
     /// </summary>
     void FixedUpdate()
     {
@@ -235,11 +225,11 @@ public class RopeController : MonoBehaviour
         Vector3 p2 = rb2.transform.position;
         float dist = Vector3.Distance(p1, p2);
 
-        if (dist > fixedRopeLength)
+        if (dist > config.ropeLength)
         {
             Vector3 dir = (p2 - p1).normalized;
-            float stretch = dist - fixedRopeLength;
-            float force = stretch * config.stretchStiffness * 20f;
+            float stretch = dist - config.ropeLength;
+            float force = stretch * config.stretchStiffness * 50f;
 
             // 双向弹簧
             rb1.AddForce(dir * force, ForceMode2D.Force);
@@ -291,7 +281,13 @@ public class RopeController : MonoBehaviour
         // 绳子必须已初始化（有粒子 + 约束批次）
         if (!rope.Initialized) return;
 
-        // --- 绳长：定长模式，Start 初始化后不再改变 ---
+        // --- 绳长（只在值变化时调 ChangeLength）---
+        if (!Mathf.Approximately(config.ropeLength, lastAppliedLength))
+        {
+            lastAppliedLength = config.ropeLength;
+            if (cursor != null)
+                cursor.ChangeLength(config.ropeLength);
+        }
 
         // --- 弯曲刚度 ---
         if (!Mathf.Approximately(config.bendingStiffness, lastAppliedBendingStiffness))
@@ -300,7 +296,23 @@ public class RopeController : MonoBehaviour
             rope.BendingConstraints.stiffness = config.bendingStiffness;
         }
 
-        // ★ 迭代次数已在 Start 硬编码（距离40/弯曲20），不再随刚度动态调整
+        // --- 拉伸刚度（影响 solver 迭代次数）---
+        if (!Mathf.Approximately(config.stretchStiffness, lastAppliedStretchStiffness))
+        {
+            lastAppliedStretchStiffness = config.stretchStiffness;
+            if (solver != null)
+            {
+                int iters = Mathf.RoundToInt(config.stretchStiffness * 10f);
+                solver.distanceConstraintParameters.iterations = Mathf.Max(1, iters);
+            }
+        }
+
+        // --- 弯曲迭代次数 ---
+        if (solver != null && !Mathf.Approximately(config.bendingStiffness, lastAppliedBendingStiffness))
+        {
+            int bendIters = Mathf.RoundToInt(config.bendingStiffness * 10f);
+            solver.bendingConstraintParameters.iterations = Mathf.Max(1, bendIters);
+        }
 
         // --- 断裂 ---
         if (!Mathf.Approximately(config.tearResistance, lastAppliedTearResistance))
