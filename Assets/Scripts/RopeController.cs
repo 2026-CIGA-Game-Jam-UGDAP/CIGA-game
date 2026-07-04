@@ -85,10 +85,11 @@ public class RopeController : MonoBehaviour
             rope.AddToSolver(null);
         }
 
-        // ★ 太空环境：零重力
+        // ★ 太空环境：零重力（必须 Push 到原生层，否则 struct field 修改不生效）
         if (solver != null)
         {
             solver.parameters.gravity = Vector4.zero;
+            solver.UpdateParameters();
         }
 
         // ★ 初始刚度从 config 读取（软绳）
@@ -250,21 +251,21 @@ public class RopeController : MonoBehaviour
         var pos = rope.positions;
         var vel = rope.velocities;
 
-        // 粒子 0 → Player1
-        if (player1Collider != null && pos.Length > 0)
+        // 粒子 0 → Player1（用 rb.position 避免 Rigidbody2D Interpolate 导致的插值偏差）
+        if (player1Collider != null && rb1 != null && pos.Length > 0)
         {
-            Vector3 target = player1Collider.transform.position + pinOffset;
+            Vector3 target = (Vector3)rb1.position + pinOffset;
             pos[0] = rope.transform.InverseTransformPoint(target);
             if (vel.Length > 0) vel[0] = Vector3.zero;
         }
 
-        // 粒子 N → Player2
-        if (player2Collider != null && pos.Length > 1)
+        // 粒子 N → Player2（同上）
+        if (player2Collider != null && rb2 != null && pos.Length > 1)
         {
             int idx = rope.UsedParticles - 1;
             if (idx < pos.Length)
             {
-                Vector3 target = player2Collider.transform.position + pinOffset;
+                Vector3 target = (Vector3)rb2.position + pinOffset;
                 pos[idx] = rope.transform.InverseTransformPoint(target);
                 if (vel.Length > idx) vel[idx] = Vector3.zero;
             }
