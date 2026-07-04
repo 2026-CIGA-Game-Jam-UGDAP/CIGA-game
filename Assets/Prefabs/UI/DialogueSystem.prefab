@@ -282,8 +282,8 @@ MonoBehaviour:
   rightPortrait: {fileID: 5491156858966997956}
   speakerNameText: {fileID: 959201764009765568}
   dialogueText: {fileID: 3699018014087912560}
-  textAnimator: {fileID: 3641481393945494090}
-  typewriter: {fileID: 5868226650191904718}
+  textAnimator: {fileID: 0}
+  typewriter: {fileID: 0}
   pressHint: {fileID: 7672898859845135251}
   portraitFadeDuration: 0.3
 --- !u!1 &5532634023642656735

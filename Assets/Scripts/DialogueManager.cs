@@ -194,11 +194,12 @@ public class DialogueManager : MonoBehaviour
         Image activeImg = isLeft ? leftPortrait : rightPortrait;
         Image inactiveImg = isLeft ? rightPortrait : leftPortrait;
 
-        // 说话方
+        // 说话方：必显示，portrait 不为空则换图，为空保持默认头像
         if (activeGroup != null) activeGroup.SetActive(true);
         if (activeImg != null)
         {
-            activeImg.sprite = sprite;
+            if (sprite != null)
+                activeImg.sprite = sprite;
             if (currentDialogue.useAnimation)
             {
                 activeImg.color = new Color(1, 1, 1, 0);
@@ -210,12 +211,9 @@ public class DialogueManager : MonoBehaviour
             }
         }
 
-        // 非说话方：变暗
-        if (inactiveGroup != null)
-        {
-            if (!inactiveGroup.activeSelf)
-                inactiveGroup.SetActive(true);
-        }
+        // 非说话方：保持显示，仅变暗
+        if (inactiveGroup != null && !inactiveGroup.activeSelf)
+            inactiveGroup.SetActive(true);
         if (inactiveImg != null && currentDialogue.useAnimation)
         {
             inactiveImg.DOFade(0.3f, portraitFadeDuration).SetUpdate(true);

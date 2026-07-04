@@ -16,12 +16,12 @@ MonoBehaviour:
   - speakerName: "\u65B9\u6CE2"
     text: "\u5F88\u5947\u5999\u7684\u8BBE\u5907\uFF01\u8FD9\u4E5F\u7B97\u662F\u4E00\u79CD\u63A2\u9669\u7684\u65B9\u6CD5\u2026\u2026\u6216\u8BB8\u56DE\u53BB\u4E5F\u53EF\u4EE5\u5F00\u53D1\u8FD9\u6837\u7684\u88C5\u5907\u3002"
     portrait: {fileID: 0}
-    bigPortrait: {fileID: 0}
+    bigPortrait: {fileID: -1828046989, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
     isLeftSide: 1
   - speakerName: "\u62C9\u5179"
     text: "\u597D\u5566\uFF0C\u7B49\u6211\u4EEC\u56DE\u53BB\u518D\u7422\u78E8\u3002\u5148\u5F00\u59CB\u6536\u96C6\u96F6\u4EF6\u5427\u3002"
     portrait: {fileID: 0}
-    bigPortrait: {fileID: 0}
+    bigPortrait: {fileID: -391726316, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
     isLeftSide: 0
   useTypingEffect: 1
   useAnimation: 0

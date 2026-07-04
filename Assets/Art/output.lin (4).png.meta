@@ -215,7 +215,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: output.lin (4)_5
+      name: "\u732B\u732B\u7B11\u59341"
       rect:
         serializedVersion: 2
         x: 1617
@@ -236,7 +236,7 @@ TextureImporter:
       edges: []
       weights: []
     - serializedVersion: 2
-      name: output.lin (4)_6
+      name: "\u65B9\u6CE2\u54ED\u59341"
       rect:
         serializedVersion: 2
         x: 43
@@ -315,9 +315,9 @@ TextureImporter:
       output.lin (4)_2: -327351780
       output.lin (4)_3: 1345686299
       output.lin (4)_4: -903214236
-      output.lin (4)_5: 424174200
-      output.lin (4)_6: 456376891
       output.lin (4)_8: -435533278
+      "\u65B9\u6CE2\u54ED\u59341": 456376891
+      "\u732B\u732B\u7B11\u59341": 424174200
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
