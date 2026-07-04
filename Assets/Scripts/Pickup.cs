@@ -18,8 +18,11 @@ public class Pickup : MonoBehaviour
     [Tooltip("拾取后恢复的能量值")]
     public float energyAmount = 3f;
 
+    bool collected;
+
     void OnTriggerEnter2D(Collider2D other)
     {
+        if (collected) return;
         var pc = other.GetComponent<PlayerController>();
         if (pc == null) return;
 
@@ -37,6 +40,7 @@ public class Pickup : MonoBehaviour
                 AudioManager.Instance.PlayPartPickup();
         }
 
+        collected = true;
         Destroy(gameObject);
     }
 }
