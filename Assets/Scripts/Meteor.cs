@@ -15,7 +15,12 @@ public class Meteor : MonoBehaviour
     [SerializeField] float tumbleSpeed = 360f;
 
     [Header("边界销毁")]
-    [SerializeField] float boundsMargin = 5f;
+    [Tooltip("超出视口的比例，0.5 = 半屏外")]
+    [SerializeField] float boundsMargin = 1.5f;
+
+    [Header("缩放")]
+    [SerializeField] float scaleRandomMin = 0.85f;
+    [SerializeField] float scaleRandomMax = 1.15f;
 
     Camera mainCam;
     bool hasHit;
@@ -23,6 +28,10 @@ public class Meteor : MonoBehaviour
     void Start()
     {
         mainCam = Camera.main;
+
+        // 随机等比缩放
+        float s = Random.Range(scaleRandomMin, scaleRandomMax);
+        transform.localScale = Vector3.one * s;
     }
 
     void Update()
@@ -35,7 +44,12 @@ public class Meteor : MonoBehaviour
 
         // 飞出屏幕销毁
         if (mainCam != null && IsOutOfBounds())
+        {
+            Vector3 vp = mainCam.WorldToViewportPoint(transform.position);
+            Debug.Log($"[Meteor] 出界销毁 vp=({vp.x:F2},{vp.y:F2}), margin={boundsMargin}");
             Destroy(gameObject);
+            return;
+        }
     }
 
     void OnTriggerEnter2D(Collider2D other)
@@ -48,12 +62,14 @@ public class Meteor : MonoBehaviour
         // 吸附状态：不弹开，陨石直接销毁
         if (player.IsAnchored)
         {
+            Debug.Log($"[Meteor] 撞到吸附玩家，销毁");
             Destroy(gameObject);
             return;
         }
 
         // 非吸附：弹开
         hasHit = true;
+        Debug.Log($"[Meteor] 撞到非吸附玩家 {player.name}，弹开");
 
         Rigidbody2D rb = player.GetComponent<Rigidbody2D>();
         if (rb != null)
@@ -70,8 +86,9 @@ public class Meteor : MonoBehaviour
 
     bool IsOutOfBounds()
     {
-        Vector3 viewportPos = mainCam.WorldToViewportPoint(transform.position);
-        return viewportPos.x < -0.1f || viewportPos.x > 1.1f
-            || viewportPos.y < -0.5f || viewportPos.y > 1.5f; // 下方给更多容错
+        if (mainCam == null) return false;
+        Vector3 vp = mainCam.WorldToViewportPoint(transform.position);
+        return vp.x < -boundsMargin || vp.x > 1f + boundsMargin
+            || vp.y < -boundsMargin || vp.y > 1f + boundsMargin;
     }
 }
