@@ -435,8 +435,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   rope: {fileID: 3030991369463343711}
   solver: {fileID: 338892861569926848}
-  cursor: {fileID: 7327717014681676022}
-  player1Transform: {fileID: 0}
-  player2Transform: {fileID: 0}
+  player1Collider: {fileID: 0}
+  player2Collider: {fileID: 0}
+  pinOffset: {x: 0, y: 0.5, z: 0}
   config: {fileID: 11400000, guid: 3510da16f23af854285301d6d98d9c10, type: 2}
   gameManager: {fileID: 0}
+  ropeRenderer: {fileID: 0}
+  transferColor: {r: 1, g: 0.8, b: 0.2, a: 1}
+  transferColorDuration: 0.3
