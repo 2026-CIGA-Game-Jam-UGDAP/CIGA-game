@@ -40,6 +40,17 @@ public class GameManager : MonoBehaviour
     [Tooltip("右上角零件收集 UI，拖引用")]
     public PartCollectionUI partHUD;
 
+    [Header("飞船对接")]
+    [Tooltip("飞船的 Animator 组件（动画 Trigger 名在下方配置）")]
+    public Animator shipAnimator;
+    [Tooltip("两个对接触发器（triggerDown / triggerUp）")]
+    public ShipDockTrigger dockTrigger1;
+    public ShipDockTrigger dockTrigger2;
+    [Tooltip("触发飞船动画的 Animator Trigger 名")]
+    public string shipAnimTrigger = "Play";
+    [Tooltip("飞船动画播放时间（秒），播完后过关")]
+    public float shipAnimDuration = 2f;
+
     [Header("下一关")]
     [Tooltip("过关后加载的场景名，Level1→Level2→Level3→Lobby")]
     public string nextSceneName = "Level2";
@@ -53,9 +64,8 @@ public class GameManager : MonoBehaviour
     [Tooltip("黑屏淡入淡出的持续时间（秒）")]
     public float fadeDuration = 0.3f;
 
-    bool p1AtGoal;
-    bool p2AtGoal;
     bool resetting;
+    bool shipAnimating;
 
     Rigidbody2D rb1;
     Rigidbody2D rb2;
@@ -115,39 +125,31 @@ public class GameManager : MonoBehaviour
         //     ResetLevel();
     }
 
-    /// <summary>终点 Trigger 调用。playerIndex: 0=P1, 1=P2</summary>
-    public void OnPlayerEnterGoal(int playerIndex)
+    /// <summary>ShipDockTrigger 调用：玩家进入对接区</summary>
+    public void OnPlayerDocked()
     {
-        if (playerIndex == 0) p1AtGoal = true;
-        if (playerIndex == 1) p2AtGoal = true;
-
-        if (p1AtGoal && p2AtGoal)
-        {
-            if (collectedGoals >= totalGoalPickups)
-                Victory();
-            else if (partHUD != null)
-                partHUD.ShakeAndFlashRed();
-        }
+        CheckShipCondition();
     }
 
-    public void OnPlayerExitGoal(int playerIndex)
+    /// <summary>ShipDockTrigger 调用：玩家离开对接区</summary>
+    public void OnPlayerUndocked()
     {
-        if (playerIndex == 0) p1AtGoal = false;
-        if (playerIndex == 1) p2AtGoal = false;
+        // 离开时不需要额外处理，CheckShipCondition 会在下次进入/收集时再判
     }
 
     /// <summary>Goal 类型 Pickup 被拾取时调用</summary>
     public void OnGoalPickupCollected()
     {
         collectedGoals++;
-        Debug.Log($"[GameManager] 零件 {collectedGoals}/{totalGoalPickups}");
 
         if (partHUD != null)
             partHUD.UpdateDisplay(collectedGoals, totalGoalPickups);
 
-        // 如果两人已经在终点，捡够零件直接过关
-        if (collectedGoals >= totalGoalPickups && p1AtGoal && p2AtGoal)
-            Victory();
+        // 全部零件收集完毕
+        if (collectedGoals >= totalGoalPickups && AudioManager.Instance != null)
+            AudioManager.Instance.PlayAllCollected();
+
+        CheckShipCondition();
     }
 
     /// <summary>绳索断裂时 Obi 调用 — 暂时禁用重开</summary>
@@ -212,8 +214,7 @@ public class GameManager : MonoBehaviour
         if (rb1 != null) rb1.velocity = Vector2.zero;
         if (rb2 != null) rb2.velocity = Vector2.zero;
 
-        p1AtGoal = false;
-        p2AtGoal = false;
+        shipAnimating = false;
         collectedGoals = 0;
         if (partHUD != null)
             partHUD.SetDisplayQuiet(0, totalGoalPickups);
@@ -245,9 +246,67 @@ public class GameManager : MonoBehaviour
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
+    /// <summary>检查飞船对接+零件收集条件</summary>
+    void CheckShipCondition()
+    {
+        if (shipAnimating)
+        {
+            Debug.Log("[Ship] shipAnimating=true，跳过检查");
+            return;
+        }
+        if (collectedGoals < totalGoalPickups)
+        {
+            Debug.Log($"[Ship] 零件不足: {collectedGoals}/{totalGoalPickups}");
+            return;
+        }
+
+        if (dockTrigger1 == null || dockTrigger2 == null)
+        {
+            Debug.Log($"[Ship] dockTrigger 未全部赋值: 1={dockTrigger1 != null} 2={dockTrigger2 != null}");
+            return;
+        }
+        if (!dockTrigger1.HasPlayer || !dockTrigger2.HasPlayer)
+        {
+            Debug.Log($"[Ship] 玩家未全部 dock: 1={dockTrigger1.HasPlayer} 2={dockTrigger2.HasPlayer}");
+            return;
+        }
+
+        // 两个 trigger 里必须是不同玩家
+        if (dockTrigger1.DockedPlayer == dockTrigger2.DockedPlayer)
+        {
+            Debug.Log("[Ship] 同一个玩家在两个 trigger 中，等待不同玩家");
+            return;
+        }
+
+        Debug.Log("[Ship] 条件满足，启动飞船动画！");
+        StartCoroutine(ShipLaunchSequence());
+    }
+
+    System.Collections.IEnumerator ShipLaunchSequence()
+    {
+        shipAnimating = true;
+
+        // 触发飞船动画
+        if (shipAnimator != null)
+            shipAnimator.SetTrigger(shipAnimTrigger);
+
+        // 等动画播完
+        yield return new WaitForSeconds(shipAnimDuration);
+
+        // 关闭两个对接触发器
+        if (dockTrigger1 != null)
+            dockTrigger1.gameObject.SetActive(false);
+        if (dockTrigger2 != null)
+            dockTrigger2.gameObject.SetActive(false);
+
+        Victory();
+    }
+
     void Victory()
     {
-        Debug.Log($"🎉 过关！零件 {collectedGoals}/{totalGoalPickups}，两人到终点 → {nextSceneName}");
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlaySceneTransition();
+
         if (!string.IsNullOrEmpty(nextSceneName))
             SceneManager.LoadScene(nextSceneName);
     }

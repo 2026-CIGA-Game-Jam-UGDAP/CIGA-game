@@ -26,11 +26,15 @@ public class Pickup : MonoBehaviour
         if (pickupType == Type.Energy)
         {
             pc.AddEnergy(energyAmount);
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlayEnergyPickup();
         }
         else if (pickupType == Type.Goal)
         {
             var gm = FindObjectOfType<GameManager>();
             if (gm != null) gm.OnGoalPickupCollected();
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlayPartPickup();
         }
 
         Destroy(gameObject);

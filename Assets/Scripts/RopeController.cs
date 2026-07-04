@@ -85,10 +85,8 @@ public class RopeController : MonoBehaviour
         // 则手动生成物理表示并加入 solver。
         if (!rope.Initialized)
         {
-            Debug.Log("[RopeController] 绳索未初始化，开始运行时生成...");
             yield return StartCoroutine(rope.GeneratePhysicRepresentationForMesh());
             rope.AddToSolver(null);
-            Debug.Log("[RopeController] 绳索初始化完成，粒子数: " + rope.UsedParticles);
         }
 
         // ★ 太空环境：零重力 + 高刚度 = 绳子不弯不坠，像一根绷紧的太空缆
@@ -100,13 +98,11 @@ public class RopeController : MonoBehaviour
             solver.distanceConstraintParameters.iterations = 10;
             solver.bendingConstraintParameters.iterations = 5;
             solver.UpdateParameters();
-            Debug.Log("[RopeController] Obi solver 重力归零, 距离迭代=10, 弯曲迭代=5");
         }
 
         // 太空零重力 → 绳子不该有任何弯曲/下坠，刚度拉满让它始终笔直
         rope.BendingConstraints.stiffness = 1f;
         rope.DistanceConstraints.stiffness = 1f;
-        Debug.Log("[RopeController] 绳索弯曲/拉伸刚度已设为 1.0（太空绷直线）");
 
         // ★ 缓存 Rigidbody2D（必须在 SetupPins 之前，用于冻结玩家）
         rb1 = player1Collider != null ? player1Collider.GetComponent<Rigidbody2D>() : null;
@@ -121,7 +117,6 @@ public class RopeController : MonoBehaviour
 
         // ★ 定长绳长：Obi 物理 rest length × 手动倍率
         fixedRopeLength = (rope.RestLength > 0f ? rope.RestLength : 5f) * ropeLengthMultiplier;
-        Debug.Log($"[RopeController] 定长绳长 = {fixedRopeLength:F2}m (Obi {rope.RestLength:F2}m × {ropeLengthMultiplier:F2})");
 
         // ★ 等绳子在冻结的玩家之间自然就位（Obi 需要几帧物理步）
         yield return new WaitForSeconds(0.2f);
@@ -166,14 +161,12 @@ public class RopeController : MonoBehaviour
         if (player1Collider != null && particleCount > 0)
         {
             batch.AddConstraint(0, player1Collider, pinOffset, Quaternion.identity, 1);
-            Debug.Log("[RopeController] Pin: 粒子 0 → Player1");
         }
 
         // 粒子 N → Player2
         if (player2Collider != null && particleCount > 1)
         {
             batch.AddConstraint(particleCount - 1, player2Collider, pinOffset, Quaternion.identity, 1);
-            Debug.Log("[RopeController] Pin: 粒子 " + (particleCount - 1) + " → Player2");
         }
 
         // 重新注册到 solver 使 pin 生效
@@ -210,8 +203,6 @@ public class RopeController : MonoBehaviour
         col2D.SourceCollider = tiny;
         col2D.Phase = 2;
         col2D.Thickness = 0f;
-
-        Debug.Log($"[RopeController] {obiCol.name} Obi 碰撞形状已换成微型 (r=0.01)");
     }
 
     void Update()
@@ -222,7 +213,6 @@ public class RopeController : MonoBehaviour
             if (!ropeBroken && rope.UsedParticles < lastUsedParticles && lastUsedParticles > 0)
             {
                 ropeBroken = true;
-                Debug.Log("[RopeController] 绳子断裂！");
                 if (gameManager != null)
                     gameManager.OnRopeBreak();
             }

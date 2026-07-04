@@ -65,10 +65,7 @@ public class DialogueManager : MonoBehaviour
     public void StartDialogue(DialogueSO dialogue)
     {
         if (dialogue == null || dialogue.lines.Length == 0)
-        {
-            Debug.LogWarning("[DialogueManager] 对话数据为空");
             return;
-        }
 
         currentDialogue = dialogue;
         currentLineIndex = 0;

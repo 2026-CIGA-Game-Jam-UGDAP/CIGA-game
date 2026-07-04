@@ -108,13 +108,9 @@ public class MeteorManager : MonoBehaviour
     void SpawnMeteor(Vector2 pos, Vector2 dir)
     {
         if (meteorPrefab == null)
-        {
-            Debug.LogWarning("[MeteorManager] meteorPrefab is null!");
             return;
-        }
 
         GameObject meteor = Instantiate(meteorPrefab, pos, Quaternion.identity);
-        Debug.Log($"[MeteorManager] 生成陨石 at {pos}, dir={dir}");
         Meteor m = meteor.GetComponent<Meteor>();
         if (m != null)
         {

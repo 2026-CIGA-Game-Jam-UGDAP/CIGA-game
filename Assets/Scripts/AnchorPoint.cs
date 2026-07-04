@@ -28,6 +28,7 @@ public class AnchorPoint : MonoBehaviour
 
     void Awake()
     {
+        float srcRadius = 0f;
         if (moveRadius <= 0f)
         {
             // 自动读非 trigger CircleCollider2D
@@ -35,7 +36,8 @@ public class AnchorPoint : MonoBehaviour
             {
                 if (!col.isTrigger)
                 {
-                    moveRadius = col.radius * Mathf.Max(transform.localScale.x, transform.localScale.y);
+                    srcRadius = col.radius;
+                    moveRadius = srcRadius * Mathf.Max(transform.localScale.x, transform.localScale.y);
                     break;
                 }
             }
@@ -44,17 +46,20 @@ public class AnchorPoint : MonoBehaviour
         {
             // 兜底：任意 CircleCollider2D（含 trigger）
             var col = GetComponent<CircleCollider2D>();
-            if (col != null) moveRadius = col.radius * Mathf.Max(transform.localScale.x, transform.localScale.y);
+            if (col != null)
+            {
+                srcRadius = col.radius;
+                moveRadius = srcRadius * Mathf.Max(transform.localScale.x, transform.localScale.y);
+            }
         }
 
         // ★ 防御：moveRadius 不能为 0，否则 GetSurfacePoint/GetSurfaceNormal 会除零产生 NaN
         if (moveRadius <= 0f)
         {
             moveRadius = 0.5f;
-            Debug.LogWarning($"[AnchorPoint] {name}: 未找到有效半径，使用兜底值 0.5。请检查是否缺少 CircleCollider2D 或 scale 为 0。");
         }
 
-        Debug.Log($"[AnchorPoint] {name}: moveRadius={moveRadius:F2}, scale=({transform.localScale.x:F2},{transform.localScale.y:F2})");
+        Debug.Log($"[AnchorPoint] {name}: moveRadius={moveRadius:F2}, scale=({transform.localScale.x:F2},{transform.localScale.y:F2}), srcRadius={srcRadius:F2}", this);
     }
 
     // ============ 圆形表面接口 ============
@@ -99,7 +104,6 @@ public class AnchorPoint : MonoBehaviour
         if (pc != null && !playersInRange.Contains(pc))
         {
             playersInRange.Add(pc);
-            Debug.Log($"[AnchorPoint] {pc.name} 进入吸附范围");
         }
     }
 
@@ -144,9 +148,20 @@ public class AnchorPoint : MonoBehaviour
 
     // ============ Gizmos ============
 
+    float GetGizmoRadius()
+    {
+        if (moveRadius > 0f) return moveRadius;
+        // Editor 模式下 Awake 还没跑，直接从 collider 算
+        foreach (var col in GetComponents<CircleCollider2D>())
+            if (!col.isTrigger) return col.radius * Mathf.Max(transform.localScale.x, transform.localScale.y);
+        var fallback = GetComponent<CircleCollider2D>();
+        if (fallback != null) return fallback.radius * Mathf.Max(transform.localScale.x, transform.localScale.y);
+        return 0.5f;
+    }
+
     void OnDrawGizmosSelected()
     {
-        float r = moveRadius > 0 ? moveRadius : 0.5f;
+        float r = GetGizmoRadius();
         Vector3 center = transform.position;
 
         Gizmos.color = Color.cyan;

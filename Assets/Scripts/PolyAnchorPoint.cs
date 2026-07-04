@@ -78,7 +78,6 @@ public class PolyAnchorPoint : MonoBehaviour
             return;
         }
 
-        Debug.LogError($"[PolyAnchorPoint] {name}: 未找到 PolygonCollider2D 或 BoxCollider2D！请在 GameObject 上添加一个。");
         totalPerimeter = 1f;
         pointSpacing = 0.1f;
         polyCenter = Vector2.zero;
@@ -127,11 +126,6 @@ public class PolyAnchorPoint : MonoBehaviour
 
         // ★ 从第一条有效边推导 MoveDirectionSign
         moveDirectionSign = ComputeMoveDirectionSign();
-
-        // ★ 汇总日志
-        Debug.Log($"[PolyAnchorPoint] {name} init done: {pathVertices.Length} edges, " +
-                  $"perimeter={totalPerimeter:F2}, moveSign={moveDirectionSign}, " +
-                  $"normals=[{string.Join(", ", System.Array.ConvertAll(edgeOutwardNormals, n => n.ToString("F2")))}]");
 
         // ★ 采样表面点（用预计算的法线）
         int pointCount = Mathf.Max(32, Mathf.CeilToInt(totalPerimeter / 0.1f));
@@ -191,10 +185,6 @@ public class PolyAnchorPoint : MonoBehaviour
         }
 
         moveDirectionSign = ComputeMoveDirectionSign();
-
-        Debug.Log($"[PolyAnchorPoint] {name} init done (Box): 4 edges, " +
-                  $"perimeter={totalPerimeter:F2}, moveSign={moveDirectionSign}, " +
-                  $"normals=[{string.Join(", ", System.Array.ConvertAll(edgeOutwardNormals, n => n.ToString("F2")))}]");
 
         int pointCount = Mathf.Max(32, Mathf.CeilToInt(totalPerimeter / 0.1f));
         pointSpacing = totalPerimeter / pointCount;

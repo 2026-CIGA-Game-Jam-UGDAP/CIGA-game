@@ -46,7 +46,6 @@ public class Meteor : MonoBehaviour
         if (mainCam != null && IsOutOfBounds())
         {
             Vector3 vp = mainCam.WorldToViewportPoint(transform.position);
-            Debug.Log($"[Meteor] 出界销毁 vp=({vp.x:F2},{vp.y:F2}), margin={boundsMargin}");
             Destroy(gameObject);
             return;
         }
@@ -62,14 +61,12 @@ public class Meteor : MonoBehaviour
         // 吸附状态：不弹开，陨石直接销毁
         if (player.IsAnchored)
         {
-            Debug.Log($"[Meteor] 撞到吸附玩家，销毁");
             Destroy(gameObject);
             return;
         }
 
         // 非吸附：弹开
         hasHit = true;
-        Debug.Log($"[Meteor] 撞到非吸附玩家 {player.name}，弹开");
 
         Rigidbody2D rb = player.GetComponent<Rigidbody2D>();
         if (rb != null)

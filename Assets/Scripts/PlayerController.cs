@@ -43,6 +43,8 @@ public class PlayerController : MonoBehaviour
     public float moveSpeed = 3f;
     [Tooltip("惯性阻尼。越小越滑（太空漂浮感），0.05=明显漂浮，1=立刻停下")]
     public float linearDrag = 0.05f;
+    [Tooltip("吸附后转身角速度（度/秒），值越小转身越平滑")]
+    public float turnSpeed = 180f;
 
     [Header("能量")]
     [Tooltip("能量段数上限")]
@@ -76,6 +78,10 @@ public class PlayerController : MonoBehaviour
     /// <summary>当前这次按住已传输的段数（松手清零）</summary>
     float transferredThisHold;
 
+    [Header("音效")]
+    [Tooltip("推进器 AudioSource（挂在 Player 上，用于循环喷射音效）")]
+    public AudioSource thrusterSource;
+
     [Header("TA 效果")]
     [Tooltip("摄像机抖动组件引用")]
     [SerializeField] CameraShake cameraShake;
@@ -92,10 +98,6 @@ public class PlayerController : MonoBehaviour
     [Tooltip("落地烟尘粒子（Player 子对象上的 ParticleSystem）")]
     [SerializeField] ParticleSystem landDust;
 
-    [Header("互动提示")]
-    [Tooltip("玩家头顶的互动提示图标（子对象，默认隐藏）。Interactable 触发时弹出")]
-    [SerializeField] GameObject interactPromptIcon;
-
     Rigidbody2D rb;
     Animator animator;
     bool isAnchored;
@@ -104,6 +106,7 @@ public class PlayerController : MonoBehaviour
     PolyAnchorPoint polyAnchoredAt;
     float surfaceT;           // 玩家在表面上的当前距离（沿周长，圆和多边形统一）
     float smoothedAngle;      // 平滑后的当前旋转角度（度），用于 LerpAngle
+    bool wasJetting;          // 上一帧是否喷气，用于检测推进器音效 Start/Stop
 
     // ---- 生命周期 ----
 
@@ -168,6 +171,21 @@ public class PlayerController : MonoBehaviour
             transferredThisHold = 0f;
 
         UpdateAnimator();
+
+        // 推进器循环音效：自由飞行喷气时 Start，停止时 Stop
+        // 在 Update 而非 FixedUpdate 处理，确保 anchored 状态下也能正确过渡
+        bool freeJetting = IsJetting && !isAnchored;
+        if (freeJetting && !wasJetting)
+        {
+            if (AudioManager.Instance != null && thrusterSource != null)
+                AudioManager.Instance.StartThruster(transform, thrusterSource);
+        }
+        else if (!freeJetting && wasJetting)
+        {
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.StopThruster(transform);
+        }
+        wasJetting = freeJetting;
     }
 
     void FixedUpdate()
@@ -243,15 +261,9 @@ public class PlayerController : MonoBehaviour
             Vector2 normal = AnchorSurfaceNormal(surfaceT);
             float targetAngle = Mathf.Atan2(normal.y, normal.x) * Mathf.Rad2Deg - 90f;
 
-            // ★ 调试：每 30 帧对比目标旋转 vs 物理实际旋转
-            if (Time.frameCount % 30 == 0)
-            {
-                Debug.Log($"[Player] t={surfaceT:F2}, normal=({normal.x:F2},{normal.y:F2}), targetAngle={targetAngle:F1}, " +
-                          $"smoothed={smoothedAngle:F1}, rbRot={rb.rotation:F1}, rbAngVel={rb.angularVelocity:F2}, " +
-                          $"pos=({rb.position.x:F2},{rb.position.y:F2}), moveDir={moveDir:F2}");
-            }
-
-            smoothedAngle = Mathf.LerpAngle(smoothedAngle, targetAngle, 20f * Time.fixedDeltaTime);
+            // ★ 恒速转身：用 MoveTowardsAngle 替代 LerpAngle 指数衰减，
+            // 避免突变时首帧转过 40% 的跳变感，匀速旋转更平滑
+            smoothedAngle = Mathf.MoveTowardsAngle(smoothedAngle, targetAngle, turnSpeed * Time.fixedDeltaTime);
 
             // ★ 防御：NaN 不入物理体
             if (!float.IsNaN(targetPos.x) && !float.IsNaN(targetPos.y))
@@ -419,10 +431,7 @@ public class PlayerController : MonoBehaviour
     {
         // ★ 防御：speed 无效则直接吸附到位
         if (speed <= 0f || float.IsNaN(speed))
-        {
-            Debug.LogWarning($"[PlayerController] AttachRoutine: speed={speed} 无效，使用瞬间吸附");
             speed = 9999f;
-        }
 
         // ★ 目标：表面上最近点（圆/多边形统一用 GetClosestSurfacePoint）
         Vector3 target = anchor.GetClosestSurfacePoint(transform.position);
@@ -436,7 +445,6 @@ public class PlayerController : MonoBehaviour
         // ★ 防御：NaN 检查（当 anchor 半径为 0 时 surface 方法可能返回 NaN）
         if (float.IsNaN(target.x) || float.IsNaN(target.y) || float.IsNaN(startAngle) || float.IsNaN(targetAngle))
         {
-            Debug.LogError($"[PlayerController] {name} AttachRoutine: 计算含 NaN。target={target}, startAngle={startAngle}, targetAngle={targetAngle}, targetNormal={targetNormal}");
             isFlyingToAnchor = false;
             yield break;
         }
@@ -504,6 +512,8 @@ public class PlayerController : MonoBehaviour
 
         // 落地反馈
         landDust?.Play();
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayAdsorption(transform.position);
         cameraShake?.Shake(0.5f);
     }
 
@@ -511,10 +521,7 @@ public class PlayerController : MonoBehaviour
     {
         // ★ 防御：speed 无效则直接吸附到位
         if (speed <= 0f || float.IsNaN(speed))
-        {
-            Debug.LogWarning($"[PlayerController] AttachRoutine(Poly): speed={speed} 无效，使用瞬间吸附");
             speed = 9999f;
-        }
 
         Vector3 target = anchor.GetClosestSurfacePoint(transform.position);
 
@@ -526,7 +533,6 @@ public class PlayerController : MonoBehaviour
         // ★ 防御：NaN 检查
         if (float.IsNaN(target.x) || float.IsNaN(target.y) || float.IsNaN(startAngle) || float.IsNaN(targetAngle))
         {
-            Debug.LogError($"[PlayerController] {name} AttachRoutine(Poly): 计算含 NaN。target={target}, startAngle={startAngle}, targetAngle={targetAngle}, targetNormal={targetNormal}");
             isFlyingToAnchor = false;
             yield break;
         }
@@ -585,6 +591,8 @@ public class PlayerController : MonoBehaviour
         IgnoreSurfaceCollision(anchor, true);
 
         landDust?.Play();
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayAdsorption(transform.position);
         cameraShake?.Shake(0.5f);
     }
 
@@ -631,21 +639,6 @@ public class PlayerController : MonoBehaviour
             Shockwave.Play(shockwavePrefab, worldPos);
     }
 
-    /// <summary>Interactable 进入范围时调用：弹出提示图标</summary>
-    public void ShowInteractPrompt()
-    {
-        if (interactPromptIcon == null) return;
-        interactPromptIcon.SetActive(true);
-        interactPromptIcon.transform.DOPunchScale(Vector3.one * 0.3f, 0.2f);
-    }
-
-    /// <summary>Interactable 离开范围时调用：隐藏提示图标</summary>
-    public void HideInteractPrompt()
-    {
-        if (interactPromptIcon != null)
-            interactPromptIcon.SetActive(false);
-    }
-
     /// ★ 忽略/恢复玩家与锚点表面的物理碰撞
     void IgnoreSurfaceCollision(Component anchor, bool ignore)
     {
@@ -656,5 +649,20 @@ public class PlayerController : MonoBehaviour
             foreach (var mc in myCols)
                 Physics2D.IgnoreCollision(mc, sc, ignore);
         }
+    }
+
+    // ---- 音效接力（Animation Event / 其他脚本调用） ----
+
+    /// <summary>
+    /// Animation Event 接力：走路动画关键帧调用此方法。
+    /// 根据锚点类型自动区分月球脚步 vs 火箭脚步。
+    /// </summary>
+    public void OnFootstep()
+    {
+        if (AudioManager.Instance == null) return;
+
+        // 圆形锚点 → 月球脚步；多边形锚点 → 火箭脚步
+        bool isMoon = anchoredAt != null;
+        AudioManager.Instance.PlayFootstepFromPlayer(transform, isMoon);
     }
 }
