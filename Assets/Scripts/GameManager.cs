@@ -40,6 +40,14 @@ public class GameManager : MonoBehaviour
     [Tooltip("右上角零件收集 UI，拖引用")]
     public PartCollectionUI partHUD;
 
+    [Header("自动吸附")]
+    [Tooltip("开局时自动将玩家吸附到飞船表面（每关可开关）")]
+    public bool autoSnapToShip = true;
+    [Tooltip("飞船的 PolyAnchorPoint 组件")]
+    public PolyAnchorPoint shipAnchor;
+    [Tooltip("自动吸附飞行速度")]
+    public float autoSnapSpeed = 15f;
+
     [Header("飞船对接")]
     [Tooltip("飞船的 Animator 组件（动画 Trigger 名在下方配置）")]
     public Animator shipAnimator;
@@ -103,6 +111,15 @@ public class GameManager : MonoBehaviour
 
         if (fadeImage != null)
             yield return fadeImage.DOFade(0f, fadeDuration).WaitForCompletion();
+
+        // ★ 自动吸附到飞船
+        if (autoSnapToShip && shipAnchor != null)
+        {
+            if (player1 != null && !player1.IsAnchored)
+                player1.AttachToAnchor(shipAnchor, autoSnapSpeed);
+            if (player2 != null && !player2.IsAnchored)
+                player2.AttachToAnchor(shipAnchor, autoSnapSpeed);
+        }
     }
 
     void Update()
