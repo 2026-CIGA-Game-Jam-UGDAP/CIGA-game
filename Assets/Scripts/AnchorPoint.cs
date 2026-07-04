@@ -40,6 +40,13 @@ public class AnchorPoint : MonoBehaviour
     public bool IsPolygon => isPolygon;
     public float SurfaceLength => isPolygon ? totalPerimeter : (2f * Mathf.PI * moveRadius);
 
+    /// <summary>
+    /// 左右移动的方向符号。+1 = t 增加方向为"右"（顺时针），-1 = 相反。
+    /// 圆形：t 沿逆时针增加 → 返回 -1。
+    /// 多边形：取决于 winding order（clockwise → +1, ccw → -1）。
+    /// </summary>
+    public float MoveDirectionSign => isPolygon ? (polyClockwise ? 1f : -1f) : -1f;
+
     void Awake()
     {
         // —— 尝试读非 trigger PolygonCollider2D ——

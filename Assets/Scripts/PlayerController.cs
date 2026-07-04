@@ -199,8 +199,8 @@ public class PlayerController : MonoBehaviour
                 if (Input.GetKey(P2_JetRight)) rawHorizontal += 1f;
             }
 
-            // ★ 圆形星球 t 正方向为逆时针 → 反转输入让 D=顺时针（向右）
-            float moveDir = anchoredAt.IsPolygon ? -rawHorizontal : rawHorizontal;
+            // ★ 用锚点的方向符号：+1 表示 t 增加 = 右（顺时针），-1 表示需要反转
+            float moveDir = rawHorizontal * anchoredAt.MoveDirectionSign;
 
             if (Mathf.Abs(moveDir) > 0.01f)
             {
