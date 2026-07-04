@@ -31,11 +31,11 @@ public class LobbyManager : MonoBehaviour
         if (fadeImage != null)
         {
             fadeImage.DOFade(1f, fadeDuration)
-                .OnComplete(() => SceneLoader.Go(GameScene.Level1));
+                .OnComplete(() => SceneLoader.Go(GameScene.Level0));
         }
         else
         {
-            SceneLoader.Go(GameScene.Level1);
+            SceneLoader.Go(GameScene.Level0);
         }
     }
 

@@ -14,10 +14,13 @@ public struct DialogueLine
     [Tooltip("对话文本")]
     public string text;
 
-    [Tooltip("立绘 Sprite")]
+    [Tooltip("小头像 Sprite")]
     public Sprite portrait;
 
-    [Tooltip("true=左侧站位, false=右侧站位")]
+    [Tooltip("大立绘 Sprite（屏幕中央）")]
+    public Sprite bigPortrait;
+
+    [Tooltip("true=左侧站位, false=右侧站位（已废弃：现在按 speakerName 硬编码站位）")]
     public bool isLeftSide;
 }
 

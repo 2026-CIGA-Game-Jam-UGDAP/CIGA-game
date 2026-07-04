@@ -693,6 +693,7 @@ MonoBehaviour:
   overlayGroup: {fileID: 3170597714765058711}
   menuBox: {fileID: 6705143923699084739}
   btnResume: {fileID: 6454025568393051698}
+  btnRestart: {fileID: 0}
   btnLobby: {fileID: 1235289078812182155}
   btnQuit: {fileID: 6020455813780819987}
 --- !u!1 &7294322319492267123

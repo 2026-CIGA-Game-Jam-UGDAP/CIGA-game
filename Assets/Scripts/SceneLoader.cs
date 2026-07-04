@@ -7,6 +7,7 @@ using UnityEngine.SceneManagement;
 public enum GameScene
 {
     Lobby,
+    Level0,
     Level1,
     Level2,
     Level3
@@ -24,6 +25,7 @@ public static class SceneLoader
         switch (scene)
         {
             case GameScene.Lobby:  return "Lobby";
+            case GameScene.Level0: return "Level0";
             case GameScene.Level1: return "Level1";
             case GameScene.Level2: return "Level2";
             case GameScene.Level3: return "Level3";

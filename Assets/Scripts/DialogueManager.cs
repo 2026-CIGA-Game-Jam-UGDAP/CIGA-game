@@ -6,7 +6,8 @@ using DG.Tweening;
 
 /// <summary>
 /// 对话系统全局单例。挂在场景 Canvas 上。
-/// 负责：显示/隐藏对话面板、逐行播放对话、打字机效果、立绘动画。
+/// 布局：中央大立绘 + 左右小头像组（头像+固定name）+ 底部对话框。
+/// 旁白时全部隐藏，只留居中文本。
 /// </summary>
 public class DialogueManager : MonoBehaviour
 {
@@ -15,25 +16,35 @@ public class DialogueManager : MonoBehaviour
     /// <summary>对话是否正在播放。其他脚本（如 PlayerController）读这个来禁用输入。</summary>
     public static bool IsActive => Instance != null && Instance.dialoguePanel.activeSelf;
 
-    [Header("UI 引用")]
+    [Header("面板根节点")]
     [Tooltip("对话面板根节点（包含所有对话 UI）")]
     public GameObject dialoguePanel;
 
-    [Tooltip("左侧立绘 Image")]
-    public Image leftPortrait;
-    [Tooltip("右侧立绘 Image")]
-    public Image rightPortrait;
-    [Tooltip("左侧立绘父节点（用于 SetActive 开关）")]
-    public GameObject leftPortraitGo;
-    [Tooltip("右侧立绘父节点（用于 SetActive 开关）")]
-    public GameObject rightPortraitGo;
+    [Header("中央大立绘")]
+    [Tooltip("屏幕中央大立绘 Image")]
+    public Image bigPortrait;
+    [Tooltip("大立绘父节点（用于 SetActive）")]
+    public GameObject bigPortraitGo;
 
-    [Tooltip("说话人名字 Text (TMP)")]
+    [Header("左侧小头像组")]
+    [Tooltip("左侧组父节点（含小头像+固定名字 TMP）")]
+    public GameObject leftGroup;
+    [Tooltip("左侧小头像 Image")]
+    public Image leftPortrait;
+
+    [Header("右侧小头像组")]
+    [Tooltip("右侧组父节点（含小头像+固定名字 TMP）")]
+    public GameObject rightGroup;
+    [Tooltip("右侧小头像 Image")]
+    public Image rightPortrait;
+
+    [Header("对话框")]
+    [Tooltip("对话框左上角说话人名字 TMP")]
     public TMP_Text speakerNameText;
-    [Tooltip("对话内容 Text (TMP)")]
+    [Tooltip("对话内容 TMP")]
     public TMP_Text dialogueText;
 
-    [Header("TextAnimator（迭代：打字机效果）")]
+    [Header("TextAnimator（打字机效果）")]
     [Tooltip("对话 Text 上的 TextAnimator_TMP 组件")]
     public TextAnimator_TMP textAnimator;
     [Tooltip("TextAnimator 上的 TypewriterByCharacter 组件")]
@@ -53,12 +64,19 @@ public class DialogueManager : MonoBehaviour
     // 内部状态
     DialogueSO currentDialogue;
     int currentLineIndex;
-    bool lineFullyShown; // 当前行打字机是否播完
-    TMPro.TextAlignmentOptions defaultAlignment; // 对话文本默认对齐，旁白时临时改居中
+    bool lineFullyShown;
+    TMPro.TextAlignmentOptions defaultAlignment;
 
     void Awake()
     {
+        if (Instance != null)
+        {
+            Destroy(gameObject);
+            return;
+        }
+
         Instance = this;
+        DontDestroyOnLoad(gameObject);
         dialoguePanel.SetActive(false);
         defaultAlignment = dialogueText.alignment;
     }
@@ -85,15 +103,9 @@ public class DialogueManager : MonoBehaviour
         if (Input.GetKeyDown(PlayerController.DialogueAdvance) || Input.GetKeyDown(PlayerController.DialogueAdvanceAlt))
         {
             if (!lineFullyShown)
-            {
-                // 打字中 → 直接完成当前句
                 CompleteTyping();
-            }
             else
-            {
-                // 已播完 → 下一句
                 AdvanceDialogue();
-            }
         }
     }
 
@@ -104,39 +116,110 @@ public class DialogueManager : MonoBehaviour
 
         bool isNarration = string.IsNullOrEmpty(line.speakerName);
 
-        // ★ 旁白/教程模式：隐藏名字和立绘，文本居中
-        speakerNameText.gameObject.SetActive(!isNarration);
         if (isNarration)
         {
-            leftPortraitGo.SetActive(false);
-            rightPortraitGo.SetActive(false);
+            // ====== 旁白模式：全部隐藏，只留居中文本 ======
+            if (bigPortraitGo != null) bigPortraitGo.SetActive(false);
+            if (leftGroup != null) leftGroup.SetActive(false);
+            if (rightGroup != null) rightGroup.SetActive(false);
+            speakerNameText.gameObject.SetActive(false);
             dialogueText.alignment = TMPro.TextAlignmentOptions.Center;
         }
         else
         {
+            // ====== 角色对话模式 ======
             dialogueText.alignment = defaultAlignment;
-            UpdatePortraits(line);
-        }
+            speakerNameText.gameObject.SetActive(true);
+            speakerNameText.text = line.speakerName;
 
-        // 名字
-        speakerNameText.text = line.speakerName;
+            // 站位：方波=左，其余=右
+            bool isLeft = line.speakerName == "方波";
+
+            // 大立绘
+            UpdateBigPortrait(line.bigPortrait);
+
+            // 小头像组
+            UpdateSmallPortraits(line.portrait, isLeft);
+        }
 
         // 文本
         if (currentDialogue.useTypingEffect && typewriter != null)
         {
-            // ★ 迭代功能：TextAnimator 打字机
             typewriter.ShowText(line.text);
             typewriter.onTextShowed.RemoveAllListeners();
             typewriter.onTextShowed.AddListener(() => OnTypingComplete());
         }
         else
         {
-            // 直接显示全文
             dialogueText.text = line.text;
             OnTypingComplete();
         }
 
         pressHint.SetActive(false);
+    }
+
+    /// <summary>大立绘：淡出→换图→淡入</summary>
+    void UpdateBigPortrait(Sprite sprite)
+    {
+        if (bigPortraitGo == null || bigPortrait == null) return;
+
+        // 如果大立绘已经显示同一张图，不动
+        if (bigPortraitGo.activeSelf && bigPortrait.sprite == sprite) return;
+
+        if (!bigPortraitGo.activeSelf)
+        {
+            // 首次显示：直接设图 + 淡入
+            bigPortraitGo.SetActive(true);
+            bigPortrait.sprite = sprite;
+            bigPortrait.color = new Color(1, 1, 1, 0);
+            bigPortrait.DOFade(1f, portraitFadeDuration).SetUpdate(true);
+        }
+        else
+        {
+            // 切换说话人：淡出→换图→淡入
+            bigPortrait.DOFade(0f, portraitFadeDuration).SetUpdate(true)
+                .OnComplete(() =>
+                {
+                    bigPortrait.sprite = sprite;
+                    bigPortrait.DOFade(1f, portraitFadeDuration).SetUpdate(true);
+                });
+        }
+    }
+
+    /// <summary>小头像组：说话人高亮，另一个变暗</summary>
+    void UpdateSmallPortraits(Sprite sprite, bool isLeft)
+    {
+        GameObject activeGroup = isLeft ? leftGroup : rightGroup;
+        GameObject inactiveGroup = isLeft ? rightGroup : leftGroup;
+        Image activeImg = isLeft ? leftPortrait : rightPortrait;
+        Image inactiveImg = isLeft ? rightPortrait : leftPortrait;
+
+        // 说话方
+        if (activeGroup != null) activeGroup.SetActive(true);
+        if (activeImg != null)
+        {
+            activeImg.sprite = sprite;
+            if (currentDialogue.useAnimation)
+            {
+                activeImg.color = new Color(1, 1, 1, 0);
+                activeImg.DOFade(1f, portraitFadeDuration).SetUpdate(true);
+            }
+            else
+            {
+                activeImg.color = Color.white;
+            }
+        }
+
+        // 非说话方：变暗
+        if (inactiveGroup != null)
+        {
+            if (!inactiveGroup.activeSelf)
+                inactiveGroup.SetActive(true);
+        }
+        if (inactiveImg != null && currentDialogue.useAnimation)
+        {
+            inactiveImg.DOFade(0.3f, portraitFadeDuration).SetUpdate(true);
+        }
     }
 
     /// <summary>打字机完成回调</summary>
@@ -150,12 +233,9 @@ public class DialogueManager : MonoBehaviour
     void CompleteTyping()
     {
         if (typewriter != null && typewriter.isShowingText)
-        {
             typewriter.SkipTypewriter();
-        }
         else
         {
-            // 没有打字机组件：直接标记完成
             dialogueText.text = currentDialogue.lines[currentLineIndex].text;
             OnTypingComplete();
         }
@@ -178,61 +258,27 @@ public class DialogueManager : MonoBehaviour
     /// <summary>结束对话</summary>
     void EndDialogue()
     {
-        // 先停掉正在打的字
         if (typewriter != null && typewriter.isShowingText)
             typewriter.SkipTypewriter();
 
         dialoguePanel.SetActive(false);
 
-        // 立绘复位
-        leftPortraitGo.SetActive(false);
-        rightPortraitGo.SetActive(false);
-
-        // 恢复名字显示（旁白模式会隐藏）
+        // 复位所有 UI
+        if (bigPortraitGo != null) bigPortraitGo.SetActive(false);
+        if (leftGroup != null) leftGroup.SetActive(false);
+        if (rightGroup != null) rightGroup.SetActive(false);
         speakerNameText.gameObject.SetActive(true);
         dialogueText.alignment = defaultAlignment;
 
         Time.timeScale = 1f;
 
-        // ★ 触发 SO 上的 UnityEvent，推进游戏状态
         var done = currentDialogue;
         currentDialogue = null;
         done?.onComplete?.Invoke();
     }
 
-    /// <summary>更新左右立绘显示</summary>
-    void UpdatePortraits(DialogueLine line)
-    {
-        Image activePortrait = line.isLeftSide ? leftPortrait : rightPortrait;
-        Image inactivePortrait = line.isLeftSide ? rightPortrait : leftPortrait;
-        GameObject activeGo = line.isLeftSide ? leftPortraitGo : rightPortraitGo;
-        GameObject inactiveGo = line.isLeftSide ? rightPortraitGo : leftPortraitGo;
-
-        // 非说话方：隐藏或变暗
-        if (inactiveGo.activeSelf && currentDialogue.useAnimation)
-        {
-            inactivePortrait.DOFade(0.3f, portraitFadeDuration).SetUpdate(true);
-        }
-
-        // 说话方
-        activeGo.SetActive(true);
-        activePortrait.sprite = line.portrait;
-
-        if (currentDialogue.useAnimation)
-        {
-            // ★ 迭代功能：DOTween 立绘淡入
-            activePortrait.color = new Color(1, 1, 1, 0);
-            activePortrait.DOFade(1f, portraitFadeDuration).SetUpdate(true);
-        }
-        else
-        {
-            activePortrait.color = Color.white;
-        }
-    }
-
     void OnDestroy()
     {
-        // 清理：如果对话中销毁，恢复时停
         if (IsActive)
             Time.timeScale = 1f;
     }
