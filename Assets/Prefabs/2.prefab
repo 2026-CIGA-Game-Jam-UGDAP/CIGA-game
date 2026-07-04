@@ -12,6 +12,7 @@ GameObject:
   - component: {fileID: 644441629651447341}
   - component: {fileID: 5331007875332724441}
   - component: {fileID: 8381450260108280955}
+  - component: {fileID: 986991272443897570}
   m_Layer: 0
   m_Name: 2
   m_TagString: Untagged
@@ -135,3 +136,16 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   pickupType: 0
   energyAmount: 3
+--- !u!114 &986991272443897570
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2518649265786107626}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b43aee5e6dddcb3438bbdc93b84a5fd5, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  speedBonus: 3
