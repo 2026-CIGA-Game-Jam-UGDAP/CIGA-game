@@ -17,8 +17,6 @@ public class RopeController : MonoBehaviour
     public ObiRope rope;
     [Tooltip("场景中的 ObiSolver 组件")]
     public ObiSolver solver;
-    [Tooltip("场景中的 ObiRopeCursor 组件")]
-    public ObiRopeCursor cursor;
 
     [Header("玩家（需要有 ObiCollider 组件）")]
     [Tooltip("玩家 1 的 ObiCollider（ObiCollider 或 ObiCollider2D）")]
@@ -42,12 +40,10 @@ public class RopeController : MonoBehaviour
     [Tooltip("GameManager 引用，断裂时回调 OnRopeBreak()")]
     public GameManager gameManager;
 
-    // 运行时动态绳长
-    float currentRopeLength;
-    float lastCursorLength;
-    float changeLengthCooldown; // ChangeLength 冷却计时器，避免频繁增删粒子→瞬态力
+    // ★ 定长绳长：Start 初始化后不再改变
+    float fixedRopeLength;
 
-    // 调参脏标记：避免每帧 ChangeLength（增删粒子是重操作）
+    // 调参脏标记
     float lastAppliedBendingStiffness = -1f;
     float lastAppliedTearResistance = -1f;
 
@@ -62,7 +58,6 @@ public class RopeController : MonoBehaviour
     {
         if (rope == null)   rope = GetComponent<ObiRope>();
         if (solver == null) solver = GetComponent<ObiSolver>();
-        if (cursor == null) cursor = GetComponent<ObiRopeCursor>();
     }
 
     IEnumerator Start()
@@ -111,16 +106,11 @@ public class RopeController : MonoBehaviour
         // === Pin 约束：粒子 0 → P1，粒子 N → P2 ===
         SetupPins();
 
-        // 初始化动态绳长：精确匹配玩家间距（不能比间距长，否则绳子被压缩→推玩家）
+        // ★ 定长绳长：精确匹配玩家间距，之后永不改变
         float playerDist = (rb1 != null && rb2 != null)
             ? Vector3.Distance(rb1.transform.position, rb2.transform.position)
             : 5f;
-        currentRopeLength = playerDist;
-        lastCursorLength = currentRopeLength;
-
-        // 同步绳长到 Obi（之后不再频繁调用 ChangeLength）
-        if (cursor != null)
-            cursor.ChangeLength(currentRopeLength);
+        fixedRopeLength = playerDist;
 
         // ★ 等绳子在冻结的玩家之间自然就位（Obi 需要几帧物理步）
         yield return new WaitForSeconds(0.2f);
@@ -217,7 +207,7 @@ public class RopeController : MonoBehaviour
     {
         if (rope != null)
         {
-            // 1. 检测断裂（UsedParticles 减少说明有粒子被撕裂）
+            // 检测断裂（UsedParticles 减少说明有粒子被撕裂）
             if (!ropeBroken && rope.UsedParticles < lastUsedParticles && lastUsedParticles > 0)
             {
                 ropeBroken = true;
@@ -228,69 +218,13 @@ public class RopeController : MonoBehaviour
             lastUsedParticles = rope.UsedParticles;
         }
 
-        // 2. 动态绳长：收绳 + 放绳
-        UpdateRopeLength();
-
-        // 3. Play Mode 实时调参（只有值变化时才 apply）
+        // Play Mode 实时调参（只有值变化时才 apply）
         ApplyConfigIfChanged();
     }
 
     /// <summary>
-    /// 动态绳长：收绳 + 放绳 + ★ 松绳缩回（绳子永不被压缩 → 只拉不推）。
-    /// </summary>
-    void UpdateRopeLength()
-    {
-        if (config == null) return;
-        float maxLen = config.ropeLength;
-        float minLen = config.minRopeLength;
-
-        // 统计谁在收绳
-        int pullers = 0;
-        if (player1Ctrl != null && player1Ctrl.IsPulling) pullers++;
-        if (player2Ctrl != null && player2Ctrl.IsPulling) pullers++;
-
-        float dist = 0f;
-        bool haveDist = rb1 != null && rb2 != null;
-        if (haveDist)
-            dist = Vector3.Distance(rb1.transform.position, rb2.transform.position);
-
-        if (pullers > 0)
-        {
-            // 收绳：减少绳长（拉人）
-            currentRopeLength -= config.retractionSpeed * pullers * Time.deltaTime;
-            if (currentRopeLength < minLen) currentRopeLength = minLen;
-        }
-        else if (haveDist && dist > currentRopeLength)
-        {
-            // 放绳：玩家间距 > 绳长 → 渐进伸长
-            float expandSpeed = config.retractionSpeed * 1.5f;
-            currentRopeLength += expandSpeed * Time.deltaTime;
-            if (currentRopeLength > dist) currentRopeLength = dist;
-            if (currentRopeLength > maxLen) currentRopeLength = maxLen;
-        }
-        else if (haveDist && dist < currentRopeLength)
-        {
-            // ★ 松绳缩回：玩家靠近了 → 缩短绳长匹配间距 → 绳子永不被压缩！
-            float shrinkSpeed = config.retractionSpeed * 2f; // 缩回比放出快
-            currentRopeLength -= shrinkSpeed * Time.deltaTime;
-            if (currentRopeLength < dist) currentRopeLength = dist;
-            if (currentRopeLength < minLen) currentRopeLength = minLen;
-        }
-
-        // ★ ChangeLength 冷却：最多每秒 5 次，避免频繁增删粒子→瞬态力推玩家
-        changeLengthCooldown -= Time.deltaTime;
-        if (cursor != null && changeLengthCooldown <= 0f
-            && Mathf.Abs(currentRopeLength - lastCursorLength) > 0.3f)
-        {
-            cursor.ChangeLength(currentRopeLength);
-            lastCursorLength = currentRopeLength;
-            changeLengthCooldown = 0.2f;
-        }
-    }
-
-    /// <summary>
-    /// 弹簧拉力：玩家间距超过当前绳长时拉回。
-    /// 单人收绳 → 单向拖拽（只拉被收的人）；无人收/双人收 → 双向弹簧。
+    /// 弹簧拉力：玩家间距超过定长绳长时双向拉回。
+    /// 定长模式下无收绳/放绳，始终双向弹簧。
     /// </summary>
     void FixedUpdate()
     {
@@ -300,32 +234,15 @@ public class RopeController : MonoBehaviour
         Vector3 p2 = rb2.transform.position;
         float dist = Vector3.Distance(p1, p2);
 
-        if (dist > currentRopeLength)
+        if (dist > fixedRopeLength)
         {
-            Vector3 dir = (p2 - p1).normalized;        // P1 → P2 方向
-            float stretch = dist - currentRopeLength;
+            Vector3 dir = (p2 - p1).normalized;
+            float stretch = dist - fixedRopeLength;
             float force = stretch * config.stretchStiffness * 20f;
 
-            bool p1Pulling = player1Ctrl != null && player1Ctrl.IsPulling;
-            bool p2Pulling = player2Ctrl != null && player2Ctrl.IsPulling;
-
-            // 只有一个人在收绳 → 单向拖拽（只拉被收的人）
-            if (p1Pulling && !p2Pulling)
-            {
-                // P1 在收 → 把 P2 拉向 P1
-                rb2.AddForce(-dir * force, ForceMode2D.Force);
-            }
-            else if (p2Pulling && !p1Pulling)
-            {
-                // P2 在收 → 把 P1 拉向 P2
-                rb1.AddForce(dir * force, ForceMode2D.Force);
-            }
-            else
-            {
-                // 都没收或都在收 → 双向弹簧（保持现有逻辑）
-                rb1.AddForce(dir * force, ForceMode2D.Force);
-                rb2.AddForce(-dir * force, ForceMode2D.Force);
-            }
+            // 双向弹簧
+            rb1.AddForce(dir * force, ForceMode2D.Force);
+            rb2.AddForce(-dir * force, ForceMode2D.Force);
         }
     }
 
@@ -373,7 +290,7 @@ public class RopeController : MonoBehaviour
         // 绳子必须已初始化（有粒子 + 约束批次）
         if (!rope.Initialized) return;
 
-        // --- 绳长：已由 UpdateRopeLength 动态管理，这里不再管 ---
+        // --- 绳长：定长模式，Start 初始化后不再改变 ---
 
         // --- 弯曲刚度 ---
         if (!Mathf.Approximately(config.bendingStiffness, lastAppliedBendingStiffness))
