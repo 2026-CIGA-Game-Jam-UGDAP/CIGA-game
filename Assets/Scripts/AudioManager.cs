@@ -23,8 +23,8 @@ public class AudioManager : MonoBehaviour
     // ============ 3D 音效 Clip（空间化） ============
     [Header("3D 空间音效")]
     public AudioClip thrusterLoopClip;
-    public AudioClip footstepMoonClip;
-    public AudioClip footstepRocketClip;
+    public AudioClip[] footstepMoonClips;
+    public AudioClip[] footstepRocketClips;
     public AudioClip adsorptionClip;
 
     [Header("3D 音源池")]
@@ -107,8 +107,14 @@ public class AudioManager : MonoBehaviour
     /// <summary>在指定位置播放脚步声。isMoon=true 月球表面，false=火箭表面</summary>
     public void PlayFootstep(Vector3 worldPos, bool isMoon)
     {
-        AudioClip clip = isMoon ? footstepMoonClip : footstepRocketClip;
+        AudioClip clip = RandomClip(isMoon ? footstepMoonClips : footstepRocketClips);
         Play3DOneShot(clip, worldPos);
+    }
+
+    AudioClip RandomClip(AudioClip[] clips)
+    {
+        if (clips == null || clips.Length == 0) return null;
+        return clips[Random.Range(0, clips.Length)];
     }
 
     void Play3DOneShot(AudioClip clip, Vector3 worldPos)

@@ -1158,6 +1158,73 @@ MonoBehaviour:
   btnQuit: {fileID: 1533231381}
   fadeImage: {fileID: 506156430}
   fadeDuration: 0.3
+--- !u!1 &2049135138
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2049135139}
+  - component: {fileID: 2049135140}
+  m_Layer: 0
+  m_Name: AudioManager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2049135139
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2049135138}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &2049135140
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2049135138}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 155e2a80c5533d940bd7c78a31eb1561, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  sceneTransitionClip: {fileID: 8300000, guid: e721b8e86a124f44e870a1c909721fb8, type: 3}
+  energyPickupClip: {fileID: 8300000, guid: 5804ad50c859a03408e0732ebda0a6b8, type: 3}
+  partPickupClip: {fileID: 8300000, guid: 7e0507217469cdf409912055cdc49852, type: 3}
+  allCollectedClip: {fileID: 8300000, guid: 45140739387ce5048b5cfc533154d6ee, type: 3}
+  thrusterLoopClip: {fileID: 8300000, guid: 1dc0455e6a4478e449fe7322b47d30e6, type: 3}
+  footstepMoonClips:
+  - {fileID: 8300000, guid: 632c41e1dc955d549bf4d35d97c5e6d4, type: 3}
+  - {fileID: 8300000, guid: 80fa8c1dfa683c2429503509239764b1, type: 3}
+  - {fileID: 8300000, guid: 2105fbae60dee5042b3ad081d6159d8b, type: 3}
+  - {fileID: 8300000, guid: 0ec5b847f4fed314fbceb216ecb1c564, type: 3}
+  - {fileID: 8300000, guid: 1189b95557aa5064ba0ddd6f489badf6, type: 3}
+  - {fileID: 8300000, guid: 3499c464b18acb4468d2ffab8a40c2b1, type: 3}
+  - {fileID: 8300000, guid: 6f9ce003e9ce5ac42a0cb9d913a8f745, type: 3}
+  footstepRocketClips:
+  - {fileID: 8300000, guid: 7a53dc67832b856468e601754b265970, type: 3}
+  - {fileID: 8300000, guid: 2f18c9db14562a64fb159d1618b7222c, type: 3}
+  - {fileID: 8300000, guid: fdc34fab447fc4342940aac9f43863e8, type: 3}
+  - {fileID: 8300000, guid: 595f49bb8f4df614e8b3274d923630e7, type: 3}
+  - {fileID: 8300000, guid: c78212d03d328ba4fb2634ccf18d3cd9, type: 3}
+  - {fileID: 8300000, guid: d076b87e50af4064d8dacc380635e87f, type: 3}
+  - {fileID: 8300000, guid: 9200d266668d78b429360998de6cad53, type: 3}
+  adsorptionClip: {fileID: 8300000, guid: 7aed1e6ed573418459f1b20270416d1f, type: 3}
+  poolSize: 6
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1165,3 +1232,4 @@ SceneRoots:
   - {fileID: 519420032}
   - {fileID: 890390172}
   - {fileID: 2002136199}
+  - {fileID: 2049135139}
