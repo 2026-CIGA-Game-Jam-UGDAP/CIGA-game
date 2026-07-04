@@ -4,6 +4,7 @@ using System.Collections.Generic;
 /// <summary>
 /// 多边形锚点（PolygonCollider2D / BoxCollider2D）：靠近按吸附键 → 飞到表面，在边表面切向移动。
 /// 再按一次 → 脱离。支持多个玩家同时吸附。
+/// 法线方向用几何中心判定（本地空间），不依赖 winding order 或 Collider 查询。
 /// 吸附键定义在 PlayerController.P1_Snap / PlayerController.P2_Snap。
 /// </summary>
 public class PolyAnchorPoint : MonoBehaviour
@@ -21,17 +22,19 @@ public class PolyAnchorPoint : MonoBehaviour
     List<PlayerController> anchoredPlayers = new List<PlayerController>();
 
     // ---- 表面数据 ----
-    bool polyClockwise;
+    Vector2 polyCenter;               // 多边形几何中心（本地空间），用于判定法线朝向
     Vector2[] pathVertices;
+    Vector2[] edgeOutwardNormals;  // ★ 预计算每条边的朝外法线（本地空间）
     float[] edgeStartT;
     Vector2[] sampledPoints;
     Vector2[] sampledNormals;
     float[] accumulatedT;
     float totalPerimeter;
     float pointSpacing;
+    float moveDirectionSign;       // ★ 预计算的移动方向符号
 
     public float SurfaceLength => totalPerimeter;
-    public float MoveDirectionSign => polyClockwise ? 1f : -1f;
+    public float MoveDirectionSign => moveDirectionSign;
 
     void Awake()
     {
@@ -44,7 +47,6 @@ public class PolyAnchorPoint : MonoBehaviour
         if (surfacePoly != null)
         {
             SamplePolygon(surfacePoly);
-            Debug.Log($"[PolyAnchorPoint] {name}: Polygon {surfacePoly.GetPath(0).Length}pts, perimeter={totalPerimeter:F2}, scale=({transform.localScale.x:F2},{transform.localScale.y:F2})");
             return;
         }
 
@@ -57,16 +59,14 @@ public class PolyAnchorPoint : MonoBehaviour
         if (surfaceBox != null)
         {
             SampleBoxCollider(surfaceBox);
-            Debug.Log($"[PolyAnchorPoint] {name}: Box, perimeter={totalPerimeter:F2}, scale=({transform.localScale.x:F2},{transform.localScale.y:F2})");
             return;
         }
 
         // 3. 兜底：任意 PolygonCollider2D（含 trigger）
-        var fallback = GetComponent<PolygonCollider2D>();
-        if (fallback != null && fallback.pathCount > 0)
+        var fallbackPoly = GetComponent<PolygonCollider2D>();
+        if (fallbackPoly != null && fallbackPoly.pathCount > 0)
         {
-            SamplePolygon(fallback);
-            Debug.Log($"[PolyAnchorPoint] {name}: Fallback Polygon (trigger), perimeter={totalPerimeter:F2}");
+            SamplePolygon(fallbackPoly);
             return;
         }
 
@@ -75,15 +75,15 @@ public class PolyAnchorPoint : MonoBehaviour
         if (fallbackBox != null)
         {
             SampleBoxCollider(fallbackBox);
-            Debug.Log($"[PolyAnchorPoint] {name}: Fallback Box (trigger), perimeter={totalPerimeter:F2}");
             return;
         }
 
         Debug.LogError($"[PolyAnchorPoint] {name}: 未找到 PolygonCollider2D 或 BoxCollider2D！请在 GameObject 上添加一个。");
-        // ★ 防御：设置兜底值避免除零 NaN
         totalPerimeter = 1f;
         pointSpacing = 0.1f;
+        polyCenter = Vector2.zero;
         pathVertices = new Vector2[] { Vector2.zero, Vector2.right };
+        edgeOutwardNormals = new Vector2[] { Vector2.up, Vector2.up };
         edgeStartT = new float[] { 0f, 1f };
         sampledPoints = new Vector2[] { Vector2.zero, Vector2.right };
         sampledNormals = new Vector2[] { Vector2.up, Vector2.up };
@@ -99,23 +99,41 @@ public class PolyAnchorPoint : MonoBehaviour
             path[i] = Vector2.Scale(raw[i], scl);
         pathVertices = path;
 
-        float signedArea = 0f;
-        for (int i = 0; i < path.Length; i++)
-        {
-            Vector2 a = path[i];
-            Vector2 b = path[(i + 1) % path.Length];
-            signedArea += a.x * b.y - b.x * a.y;
-        }
-        polyClockwise = signedArea < 0f;
-
+        // ★ 计算周长和边起始 t
         totalPerimeter = 0f;
         edgeStartT = new float[path.Length];
+        float[] edgeLengths = new float[path.Length];
         for (int i = 0; i < path.Length; i++)
         {
             edgeStartT[i] = totalPerimeter;
-            totalPerimeter += Vector2.Distance(path[i], path[(i + 1) % path.Length]);
+            edgeLengths[i] = Vector2.Distance(path[i], path[(i + 1) % path.Length]);
+            totalPerimeter += edgeLengths[i];
         }
 
+        // ★ 先算几何中心（本地空间），ComputeOutwardNormal 依赖它
+        polyCenter = Vector2.zero;
+        for (int i = 0; i < path.Length; i++)
+            polyCenter += path[i];
+        polyCenter /= path.Length;
+
+        // ★ 用几何中心判定每条边的朝外法线
+        edgeOutwardNormals = new Vector2[path.Length];
+        for (int i = 0; i < path.Length; i++)
+        {
+            Vector2 start = path[i];
+            Vector2 end = path[(i + 1) % path.Length];
+            edgeOutwardNormals[i] = ComputeOutwardNormal(start, end);
+        }
+
+        // ★ 从第一条有效边推导 MoveDirectionSign
+        moveDirectionSign = ComputeMoveDirectionSign();
+
+        // ★ 汇总日志
+        Debug.Log($"[PolyAnchorPoint] {name} init done: {pathVertices.Length} edges, " +
+                  $"perimeter={totalPerimeter:F2}, moveSign={moveDirectionSign}, " +
+                  $"normals=[{string.Join(", ", System.Array.ConvertAll(edgeOutwardNormals, n => n.ToString("F2")))}]");
+
+        // ★ 采样表面点（用预计算的法线）
         int pointCount = Mathf.Max(32, Mathf.CeilToInt(totalPerimeter / 0.1f));
         pointSpacing = totalPerimeter / pointCount;
         sampledPoints = new Vector2[pointCount];
@@ -141,20 +159,42 @@ public class PolyAnchorPoint : MonoBehaviour
         Vector2 off = Vector2.Scale(box.offset, scl);
 
         Vector2[] path = new Vector2[4];
-        path[0] = new Vector2( half.x,  half.y) + off;
-        path[1] = new Vector2( half.x, -half.y) + off;
-        path[2] = new Vector2(-half.x, -half.y) + off;
-        path[3] = new Vector2(-half.x,  half.y) + off;
+        path[0] = new Vector2( half.x,  half.y) + off;  // 右上
+        path[1] = new Vector2( half.x, -half.y) + off;  // 右下
+        path[2] = new Vector2(-half.x, -half.y) + off;  // 左下
+        path[3] = new Vector2(-half.x,  half.y) + off;  // 左上
         pathVertices = path;
-        polyClockwise = true;
 
         totalPerimeter = 0f;
         edgeStartT = new float[4];
+        float[] edgeLengths = new float[4];
         for (int i = 0; i < 4; i++)
         {
             edgeStartT[i] = totalPerimeter;
-            totalPerimeter += Vector2.Distance(path[i], path[(i + 1) % 4]);
+            edgeLengths[i] = Vector2.Distance(path[i], path[(i + 1) % 4]);
+            totalPerimeter += edgeLengths[i];
         }
+
+        // ★ 先算几何中心
+        polyCenter = Vector2.zero;
+        for (int i = 0; i < 4; i++)
+            polyCenter += path[i];
+        polyCenter /= 4f;
+
+        // ★ 用几何中心判定每条边的朝外法线
+        edgeOutwardNormals = new Vector2[4];
+        for (int i = 0; i < 4; i++)
+        {
+            Vector2 start = path[i];
+            Vector2 end = path[(i + 1) % 4];
+            edgeOutwardNormals[i] = ComputeOutwardNormal(start, end);
+        }
+
+        moveDirectionSign = ComputeMoveDirectionSign();
+
+        Debug.Log($"[PolyAnchorPoint] {name} init done (Box): 4 edges, " +
+                  $"perimeter={totalPerimeter:F2}, moveSign={moveDirectionSign}, " +
+                  $"normals=[{string.Join(", ", System.Array.ConvertAll(edgeOutwardNormals, n => n.ToString("F2")))}]");
 
         int pointCount = Mathf.Max(32, Mathf.CeilToInt(totalPerimeter / 0.1f));
         pointSpacing = totalPerimeter / pointCount;
@@ -174,6 +214,54 @@ public class PolyAnchorPoint : MonoBehaviour
             accumulatedT[i] = i * pointSpacing;
     }
 
+    /// <summary>
+    /// 判定朝外法线：沿边方向的两个垂直方向中，指向远离多边形几何中心的方向即为朝外。
+    /// 纯本地空间计算，不依赖 Collider 查询，不受 transform scale 影响。
+    /// 适用于凸多边形和大多数简单凹多边形。
+    /// </summary>
+    Vector2 ComputeOutwardNormal(Vector2 start, Vector2 end)
+    {
+        Vector2 edgeDir = (end - start).normalized;
+        Vector2 perpA = new Vector2(-edgeDir.y, edgeDir.x);   // 左侧垂直
+        Vector2 perpB = new Vector2(edgeDir.y, -edgeDir.x);   // 右侧垂直
+
+        Vector2 localMid = (start + end) * 0.5f;
+        Vector2 centerToMid = localMid - polyCenter;
+
+        // dotA > 0: perpA 与 centerToMid 同向 → 远离中心 → 朝外
+        // dotA < 0: perpA 与 centerToMid 反向 → 指向中心 → 朝内 → perpB 朝外
+        float dotA = Vector2.Dot(perpA, centerToMid);
+        if (dotA >= 0f) return perpA;  // perpA 朝外
+        return perpB;                  // perpB 朝外
+    }
+
+    /// <summary>
+    /// 推导移动方向符号：玩家按右键时，surfaceT 是增加还是减少？
+    /// 检查第一条有效边：edgeDir 与 (outwardNormal 的右垂直) 是否同向。
+    /// </summary>
+    float ComputeMoveDirectionSign()
+    {
+        for (int i = 0; i < pathVertices.Length; i++)
+        {
+            Vector2 start = pathVertices[i];
+            Vector2 end = pathVertices[(i + 1) % pathVertices.Length];
+            float len = Vector2.Distance(start, end);
+            if (len < 0.0001f) continue;
+
+            Vector2 edgeDir = (end - start).normalized;
+            Vector2 n = edgeOutwardNormals[i];
+            // 玩家面朝朝外法线 n，玩家的"右"方向 = n 顺时针旋转 90° = (n.y, -n.x)
+            Vector2 rightPerp = new Vector2(n.y, -n.x);
+            float dot = Vector2.Dot(edgeDir, rightPerp);
+            if (Mathf.Abs(dot) < 0.001f) continue;
+
+            // edgeDir 与 rightPerp 同向 → t 增大 = 向右 → sign = +1
+            // edgeDir 与 rightPerp 反向 → t 增大 = 向左 → sign = -1
+            return Mathf.Sign(dot);
+        }
+        return -1f; // 兜底
+    }
+
     void GetPointOnPath(float t, out Vector2 point, out Vector2 normal)
     {
         float accumulated = 0f;
@@ -188,16 +276,14 @@ public class PolyAnchorPoint : MonoBehaviour
             {
                 float edgeT = Mathf.Clamp01((t - accumulated) / edgeLen);
                 point = Vector2.Lerp(start, end, edgeT);
-                Vector2 edgeDir = (end - start).normalized;
-                Vector2 leftNormal = new Vector2(-edgeDir.y, edgeDir.x);
-                normal = polyClockwise ? leftNormal : -leftNormal;
+                normal = edgeOutwardNormals[i]; // ★ 使用预计算的法线
                 return;
             }
             accumulated += edgeLen;
         }
 
         point = pathVertices[pathVertices.Length - 1];
-        normal = Vector2.up;
+        normal = edgeOutwardNormals.Length > 0 ? edgeOutwardNormals[edgeOutwardNormals.Length - 1] : Vector2.up;
     }
 
     // ============ 表面接口 ============
@@ -236,23 +322,30 @@ public class PolyAnchorPoint : MonoBehaviour
         return (Vector2)transform.position + local;
     }
 
+    /// <summary>
+    /// ★ 改用与 GetSurfacePoint 相同的采样查找，保证位置和法线完全一致。
+    /// 不再重新从边几何推算，避免两套数据结构边界不一致。
+    /// </summary>
     public Vector2 GetSurfaceNormal(float t)
     {
         t = WrapT(t);
-
-        int edgeIdx = -1;
-        for (int i = 0; i < pathVertices.Length; i++)
+        int idx = FindSampleIndex(t);
+        int next;
+        float baseT = accumulatedT[idx];
+        float segLen;
+        if (idx == accumulatedT.Length - 1)
         {
-            float edgeEnd = (i == pathVertices.Length - 1) ? totalPerimeter : edgeStartT[i + 1];
-            if (t >= edgeStartT[i] && t < edgeEnd) { edgeIdx = i; break; }
+            next = 0;
+            segLen = totalPerimeter - baseT;
         }
-        if (edgeIdx < 0) edgeIdx = pathVertices.Length - 1;
-
-        Vector2 start = pathVertices[edgeIdx];
-        Vector2 end = pathVertices[(edgeIdx + 1) % pathVertices.Length];
-        Vector2 edgeDir = (end - start).normalized;
-        Vector2 leftNormal = new Vector2(-edgeDir.y, edgeDir.x);
-        return polyClockwise ? leftNormal : -leftNormal;
+        else
+        {
+            next = idx + 1;
+            segLen = accumulatedT[next] - baseT;
+        }
+        float frac = segLen > 0.0001f ? Mathf.Clamp01((t - baseT) / segLen) : 0f;
+        Vector2 n = Vector2.Lerp(sampledNormals[idx], sampledNormals[next], frac).normalized;
+        return n;
     }
 
     public float FindClosestSurfaceT(Vector3 worldPos)
@@ -321,7 +414,6 @@ public class PolyAnchorPoint : MonoBehaviour
         if (pc != null && !playersInRange.Contains(pc))
         {
             playersInRange.Add(pc);
-            Debug.Log($"[PolyAnchorPoint] {pc.name} 进入吸附范围");
         }
     }
 
@@ -380,9 +472,10 @@ public class PolyAnchorPoint : MonoBehaviour
             Gizmos.DrawLine(a, b);
 
             Vector2 mid = (a + b) * 0.5f;
-            Vector2 edgeDir = (b - a).normalized;
-            Vector2 leftNormal = new Vector2(-edgeDir.y, edgeDir.x);
-            Vector2 outward = polyClockwise ? leftNormal : -leftNormal;
+            // ★ 使用预计算的法线
+            Vector2 outward = edgeOutwardNormals != null && i < edgeOutwardNormals.Length
+                ? edgeOutwardNormals[i]
+                : Vector2.up;
             Gizmos.color = Color.yellow;
             Gizmos.DrawLine(mid, mid + outward * 0.5f);
 

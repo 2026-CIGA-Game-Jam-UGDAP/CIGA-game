@@ -1,4 +1,5 @@
 using UnityEngine;
+using DG.Tweening;
 
 /// <summary>
 /// 太空惯性移动 —— 无重力漂浮 + 喷气背包。
@@ -14,7 +15,7 @@ public class PlayerController : MonoBehaviour
     public const KeyCode P1_JetUp      = KeyCode.W;
     public const KeyCode P1_JetLeft    = KeyCode.A;
     public const KeyCode P1_JetRight   = KeyCode.D;
-    public const KeyCode P1_Transfer   = KeyCode.E;
+    public const KeyCode P1_Transfer   = KeyCode.F;
     public const KeyCode P1_Snap       = KeyCode.LeftShift;
 
     // P2
@@ -25,9 +26,9 @@ public class PlayerController : MonoBehaviour
     public const KeyCode P2_Snap       = KeyCode.Return;
 
     // 通用
-    public const KeyCode Interact          = KeyCode.F;
+    public const KeyCode Interact          = KeyCode.E;
     public const KeyCode DialogueAdvance   = KeyCode.Space;
-    public const KeyCode DialogueAdvanceAlt = KeyCode.F;
+    public const KeyCode DialogueAdvanceAlt = KeyCode.E;
     // =====================================
     [Header("玩家索引")]
     [Tooltip("0 = P1 (WASD), 1 = P2 (方向键)")]
@@ -90,6 +91,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] GameObject shockwavePrefab;
     [Tooltip("落地烟尘粒子（Player 子对象上的 ParticleSystem）")]
     [SerializeField] ParticleSystem landDust;
+
+    [Header("互动提示")]
+    [Tooltip("玩家头顶的互动提示图标（子对象，默认隐藏）。Interactable 触发时弹出")]
+    [SerializeField] GameObject interactPromptIcon;
 
     Rigidbody2D rb;
     Animator animator;
@@ -238,6 +243,14 @@ public class PlayerController : MonoBehaviour
             Vector2 normal = AnchorSurfaceNormal(surfaceT);
             float targetAngle = Mathf.Atan2(normal.y, normal.x) * Mathf.Rad2Deg - 90f;
 
+            // ★ 调试：每 30 帧对比目标旋转 vs 物理实际旋转
+            if (Time.frameCount % 30 == 0)
+            {
+                Debug.Log($"[Player] t={surfaceT:F2}, normal=({normal.x:F2},{normal.y:F2}), targetAngle={targetAngle:F1}, " +
+                          $"smoothed={smoothedAngle:F1}, rbRot={rb.rotation:F1}, rbAngVel={rb.angularVelocity:F2}, " +
+                          $"pos=({rb.position.x:F2},{rb.position.y:F2}), moveDir={moveDir:F2}");
+            }
+
             smoothedAngle = Mathf.LerpAngle(smoothedAngle, targetAngle, 20f * Time.fixedDeltaTime);
 
             // ★ 防御：NaN 不入物理体
@@ -349,6 +362,19 @@ public class PlayerController : MonoBehaviour
     /// <summary>锚点调用：解除吸附，恢复自由移动</summary>
     public void DetachFromAnchor()
     {
+        // ★ 恢复碰撞
+        Component anchorComp = (Component)anchoredAt ?? polyAnchoredAt;
+        if (anchorComp != null)
+        {
+            var myCols = GetComponents<Collider2D>();
+            foreach (var sc in anchorComp.GetComponents<Collider2D>())
+            {
+                if (sc.isTrigger) continue;
+                foreach (var mc in myCols)
+                    Physics2D.IgnoreCollision(mc, sc, false);
+            }
+        }
+
         isAnchored = false;
         anchoredAt = null;
         polyAnchoredAt = null;
@@ -473,6 +499,9 @@ public class PlayerController : MonoBehaviour
         isFlyingToAnchor = false;
         isAnchored = true;
 
+        // ★ 忽略碰撞
+        IgnoreSurfaceCollision(anchor, true);
+
         // 落地反馈
         landDust?.Play();
         cameraShake?.Shake(0.5f);
@@ -552,6 +581,9 @@ public class PlayerController : MonoBehaviour
         isFlyingToAnchor = false;
         isAnchored = true;
 
+        // ★ 忽略玩家与表面非 trigger collider 的物理碰撞，防止物理引擎推歪/推倒玩家
+        IgnoreSurfaceCollision(anchor, true);
+
         landDust?.Play();
         cameraShake?.Shake(0.5f);
     }
@@ -597,5 +629,32 @@ public class PlayerController : MonoBehaviour
     {
         if (shockwavePrefab != null)
             Shockwave.Play(shockwavePrefab, worldPos);
+    }
+
+    /// <summary>Interactable 进入范围时调用：弹出提示图标</summary>
+    public void ShowInteractPrompt()
+    {
+        if (interactPromptIcon == null) return;
+        interactPromptIcon.SetActive(true);
+        interactPromptIcon.transform.DOPunchScale(Vector3.one * 0.3f, 0.2f);
+    }
+
+    /// <summary>Interactable 离开范围时调用：隐藏提示图标</summary>
+    public void HideInteractPrompt()
+    {
+        if (interactPromptIcon != null)
+            interactPromptIcon.SetActive(false);
+    }
+
+    /// ★ 忽略/恢复玩家与锚点表面的物理碰撞
+    void IgnoreSurfaceCollision(Component anchor, bool ignore)
+    {
+        var myCols = GetComponents<Collider2D>();
+        foreach (var sc in anchor.GetComponents<Collider2D>())
+        {
+            if (sc.isTrigger) continue;
+            foreach (var mc in myCols)
+                Physics2D.IgnoreCollision(mc, sc, ignore);
+        }
     }
 }

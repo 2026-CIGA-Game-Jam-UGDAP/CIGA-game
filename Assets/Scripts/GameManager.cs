@@ -32,9 +32,17 @@ public class GameManager : MonoBehaviour
     public float deathY = -10f;
 
     [Header("通关零件")]
-    [Tooltip("场景中 Goal 类型 Pickup 的总数")]
-    public int totalGoalPickups = 3;
+    [Tooltip("场景中 Goal 类型 Pickup 的总数（需捡够这个数才能过关）")]
+    public int totalGoalPickups = 5;
     int collectedGoals;
+
+    [Header("零件 HUD")]
+    [Tooltip("右上角零件收集 UI，拖引用")]
+    public PartCollectionUI partHUD;
+
+    [Header("下一关")]
+    [Tooltip("过关后加载的场景名，Level1→Level2→Level3→Lobby")]
+    public string nextSceneName = "Level2";
 
     [Header("暂停菜单")]
     public PauseMenu pauseMenu;
@@ -59,6 +67,10 @@ public class GameManager : MonoBehaviour
     {
         rb1 = player1 != null ? player1.GetComponent<Rigidbody2D>() : null;
         rb2 = player2 != null ? player2.GetComponent<Rigidbody2D>() : null;
+
+        // 初始化 HUD
+        if (partHUD != null)
+            partHUD.SetDisplayQuiet(0, totalGoalPickups);
 
         // 开局黑屏，等绳子就位后淡出
         if (fadeImage != null)
@@ -110,7 +122,12 @@ public class GameManager : MonoBehaviour
         if (playerIndex == 1) p2AtGoal = true;
 
         if (p1AtGoal && p2AtGoal)
-            Victory();
+        {
+            if (collectedGoals >= totalGoalPickups)
+                Victory();
+            else if (partHUD != null)
+                partHUD.ShakeAndFlashRed();
+        }
     }
 
     public void OnPlayerExitGoal(int playerIndex)
@@ -124,7 +141,12 @@ public class GameManager : MonoBehaviour
     {
         collectedGoals++;
         Debug.Log($"[GameManager] 零件 {collectedGoals}/{totalGoalPickups}");
-        if (collectedGoals >= totalGoalPickups)
+
+        if (partHUD != null)
+            partHUD.UpdateDisplay(collectedGoals, totalGoalPickups);
+
+        // 如果两人已经在终点，捡够零件直接过关
+        if (collectedGoals >= totalGoalPickups && p1AtGoal && p2AtGoal)
             Victory();
     }
 
@@ -193,6 +215,8 @@ public class GameManager : MonoBehaviour
         p1AtGoal = false;
         p2AtGoal = false;
         collectedGoals = 0;
+        if (partHUD != null)
+            partHUD.SetDisplayQuiet(0, totalGoalPickups);
 
         // 7. 重新启用绳索
         if (rope != null)
@@ -223,7 +247,8 @@ public class GameManager : MonoBehaviour
 
     void Victory()
     {
-        Debug.Log("🎉 两人都到终点，过关！");
-        // TODO: 过关动画 / 下一关
+        Debug.Log($"🎉 过关！零件 {collectedGoals}/{totalGoalPickups}，两人到终点 → {nextSceneName}");
+        if (!string.IsNullOrEmpty(nextSceneName))
+            SceneManager.LoadScene(nextSceneName);
     }
 }
