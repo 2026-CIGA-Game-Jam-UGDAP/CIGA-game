@@ -142,6 +142,8 @@ public class DialogueManager : MonoBehaviour
             UpdateSmallPortraits(line.portrait, isLeft);
         }
 
+        pressHint.SetActive(false);
+
         // 文本
         if (currentDialogue.useTypingEffect && typewriter != null)
         {
@@ -154,8 +156,6 @@ public class DialogueManager : MonoBehaviour
             dialogueText.text = line.text;
             OnTypingComplete();
         }
-
-        pressHint.SetActive(false);
     }
 
     /// <summary>大立绘：淡出→换图→淡入</summary>
