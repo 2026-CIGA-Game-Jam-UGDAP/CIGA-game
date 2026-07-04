@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections;
 using Obi;
+using DG.Tweening;
 
 /// <summary>
 /// Obi 绳索管理器：运行时初始化 + Pin 约束 + 实时调参 + 断裂检测。
@@ -40,6 +41,14 @@ public class RopeController : MonoBehaviour
     [Tooltip("GameManager 引用，断裂时回调 OnRopeBreak()")]
     public GameManager gameManager;
 
+    [Header("传输特效")]
+    [Tooltip("绳子渲染器（拖入 MeshRenderer 或 Obi 渲染器组件）")]
+    public Renderer ropeRenderer;
+    [Tooltip("传输时绳子的目标颜色")]
+    public Color transferColor = new Color(1f, 0.8f, 0.2f, 1f);
+    [Tooltip("传输颜色动画时长")]
+    public float transferColorDuration = 0.3f;
+
     // ★ 定长绳长：Start 初始化后不再改变
     float fixedRopeLength;
 
@@ -50,6 +59,10 @@ public class RopeController : MonoBehaviour
     bool ropeBroken;
     bool pinsSetup;
     int lastUsedParticles;
+    bool isTransferEffectActive;
+    Color originalRopeColor;
+    Material ropeMaterialInstance;
+    Tweener transferTweener;
 
     Rigidbody2D rb1;
     Rigidbody2D rb2;
@@ -317,5 +330,38 @@ public class RopeController : MonoBehaviour
         ropeBroken = false;
         if (rope != null)
             lastUsedParticles = rope.UsedParticles;
+    }
+
+    /// <summary>传输能量时绳子变色特效。PlayerController 按住/松开传输键时调用。</summary>
+    public void SetTransferEffect(bool active)
+    {
+        // 懒加载：首次取绳子材质实例
+        if (ropeMaterialInstance == null)
+        {
+            // 优先用手动拖入的 renderer，否则自动找
+            if (ropeRenderer == null)
+                ropeRenderer = GetComponent<Renderer>();
+            if (ropeRenderer == null) return;
+
+            ropeMaterialInstance = ropeRenderer.material;
+            originalRopeColor = ropeMaterialInstance.color;
+        }
+
+        if (active && !isTransferEffectActive)
+        {
+            isTransferEffectActive = true;
+            transferTweener?.Kill();
+            transferTweener = ropeMaterialInstance
+                .DOColor(transferColor, transferColorDuration)
+                .SetEase(Ease.OutQuad);
+        }
+        else if (!active && isTransferEffectActive)
+        {
+            isTransferEffectActive = false;
+            transferTweener?.Kill();
+            transferTweener = ropeMaterialInstance
+                .DOColor(originalRopeColor, transferColorDuration)
+                .SetEase(Ease.OutQuad);
+        }
     }
 }

@@ -16,7 +16,7 @@ public class Pickup : MonoBehaviour
 
     [Header("能量恢复量（仅 Energy 类型有效）")]
     [Tooltip("拾取后恢复的能量值")]
-    public float energyAmount = 30f;
+    public float energyAmount = 3f;
 
     void OnTriggerEnter2D(Collider2D other)
     {

@@ -37,7 +37,7 @@ public class PlayerController : MonoBehaviour
 
     [Header("移动")]
     [Tooltip("喷气推力大小，值越大加速越快")]
-    public float jetForce = 5f;
+    public float jetForce = 10f;
     [Tooltip("最高移动速度限制")]
     public float maxSpeed = 8f;
     [Tooltip("星球表面移动速度（沿表面切向）")]
@@ -46,10 +46,12 @@ public class PlayerController : MonoBehaviour
     public float linearDrag = 0.05f;
 
     [Header("能量")]
-    [Tooltip("能量上限")]
-    [SerializeField] float maxEnergy = 100f;
-    [Tooltip("每次喷气瞬时消耗的能量（按一下扣一次）")]
-    [SerializeField] float energyPerBurst = 15f;
+    [Tooltip("能量段数上限")]
+    [SerializeField] float maxEnergy = 6f;
+    [Tooltip("每次喷气消耗的段数")]
+    [SerializeField] float energyPerBurst = 1f;
+    [Tooltip("最大可传输段数（单次按住上限）")]
+    [SerializeField] float maxTransferSegments = 3f;
     float currentEnergy;
 
     // ★ 瞬时喷气：Update 捕获按下的方向，FixedUpdate 消费后清零
@@ -69,7 +71,12 @@ public class PlayerController : MonoBehaviour
     [Tooltip("拖入另一个玩家的 PlayerController 引用")]
     public PlayerController otherPlayer;
     [Tooltip("按住传输键时每秒传给队友的能量")]
-    [SerializeField] float transferRate = 30f;
+    [SerializeField] float transferRate = 3f;
+    [Tooltip("绳索控制器引用（传输时改变绳子颜色）")]
+    [SerializeField] RopeController ropeController;
+
+    /// <summary>当前这次按住已传输的段数（松手清零）</summary>
+    float transferredThisHold;
 
     /// <summary>是否正在按收绳键（给 RopeController 读）</summary>
     public bool IsPulling { get; private set; }
@@ -87,6 +94,8 @@ public class PlayerController : MonoBehaviour
     [SerializeField] SpawnBounce spawnBounce;
     [Tooltip("冲击波预制体（运行时 Instantiate）")]
     [SerializeField] GameObject shockwavePrefab;
+    [Tooltip("落地烟尘粒子（Player 子对象上的 ParticleSystem）")]
+    [SerializeField] ParticleSystem landDust;
 
     Rigidbody2D rb;
     SpriteRenderer spriteRenderer;
@@ -135,19 +144,34 @@ public class PlayerController : MonoBehaviour
 
         if (otherPlayer == null) return;
 
-        // ★ 能量传输：按住给队友传能量（对方满了就停）
-        if (Input.GetKey(playerIndex == 0 ? P1_Transfer : P2_Transfer) && currentEnergy > 0f)
+        // ★ 能量传输：按住给队友传能量（段数制，单次按住有上限）
+        KeyCode transferKey = playerIndex == 0 ? P1_Transfer : P2_Transfer;
+        bool holdingTransfer = Input.GetKey(transferKey);
+        bool transferredThisFrame = false;
+
+        if (holdingTransfer && currentEnergy > 0f && transferredThisHold < maxTransferSegments)
         {
             float amount = transferRate * Time.deltaTime;
             amount = Mathf.Min(amount, currentEnergy);
+            amount = Mathf.Min(amount, maxTransferSegments - transferredThisHold);
             float space = otherPlayer.MaxEnergy - otherPlayer.CurrentEnergy;
             if (space > 0f)
             {
                 amount = Mathf.Min(amount, space);
                 currentEnergy -= amount;
+                transferredThisHold += amount;
                 otherPlayer.AddEnergy(amount);
+                transferredThisFrame = true;
             }
         }
+
+        // 传输特效：只在能量实际流动时变色
+        if (ropeController != null)
+            ropeController.SetTransferEffect(transferredThisFrame);
+
+        // 松手重置传输计数
+        if (!holdingTransfer)
+            transferredThisHold = 0f;
 
         // ★ 收绳：暴露给 RopeController 读
         IsPulling = Input.GetKey(playerIndex == 0 ? P1_PullRope : P2_PullRope);
@@ -175,8 +199,8 @@ public class PlayerController : MonoBehaviour
         // ★ 星球表面移动：沿表面切向移动，头朝外、脚朝球心（圆/多边形统一）
         if (isAnchored)
         {
-            // 直接读原始水平输入，不用世界空间转换（避免法线方向影响移动）
             float rawHorizontal = 0f;
+
             if (playerIndex == 0)
             {
                 if (Input.GetKey(P1_JetLeft))  rawHorizontal -= 1f;
@@ -188,10 +212,12 @@ public class PlayerController : MonoBehaviour
                 if (Input.GetKey(P2_JetRight)) rawHorizontal += 1f;
             }
 
-            if (Mathf.Abs(rawHorizontal) > 0.01f)
+            // ★ 圆形星球 t 正方向为逆时针 → 反转输入让 D=顺时针（向右）
+            float moveDir = anchoredAt.IsPolygon ? -rawHorizontal : rawHorizontal;
+
+            if (Mathf.Abs(moveDir) > 0.01f)
             {
-                // D/→ = 顺时针增加 surfaceT，A/← = 逆时针减少 surfaceT
-                surfaceT += rawHorizontal * moveSpeed * Time.fixedDeltaTime;
+                surfaceT += moveDir * moveSpeed * Time.fixedDeltaTime;
                 IsJetting = true;
             }
             else
@@ -199,20 +225,14 @@ public class PlayerController : MonoBehaviour
                 IsJetting = false;
             }
 
-            // ★ 碰碰车弹开：OnCollisionStay2D 里处理，这里不再检测距离
-
             Vector2 targetPos = anchoredAt.GetSurfacePoint(surfaceT);
-
-            // ★ 统一用预采样的表面法线（圆形：数学公式，多边形：边法线插值）
             Vector2 normal = anchoredAt.GetSurfaceNormal(surfaceT);
+            float targetAngle = Mathf.Atan2(normal.y, normal.x) * Mathf.Rad2Deg - 90f;
+
+            smoothedAngle = Mathf.LerpAngle(smoothedAngle, targetAngle, 20f * Time.fixedDeltaTime);
 
             rb.MovePosition(targetPos);
             rb.velocity = Vector2.zero;
-            rb.angularVelocity = 0f;
-
-            float targetAngle = Mathf.Atan2(normal.y, normal.x) * Mathf.Rad2Deg - 90f;
-            // ★ 平滑旋转过渡（拐角处不会突然跳变）
-            smoothedAngle = Mathf.LerpAngle(smoothedAngle, targetAngle, 20f * Time.fixedDeltaTime);
             rb.MoveRotation(smoothedAngle);
 
             return;
@@ -380,9 +400,13 @@ public class PlayerController : MonoBehaviour
 
         isFlyingToAnchor = false;
         isAnchored = true;
+
+        // 落地反馈
+        landDust?.Play();
+        cameraShake?.Shake(0.5f);
     }
 
-    // ---- 碰碰车弹开（碰撞体检测）----
+    // ---- 碰碰车弹开 ----
 
     void OnCollisionEnter2D(Collision2D collision)
     {
@@ -391,7 +415,7 @@ public class PlayerController : MonoBehaviour
         PlayerController other = collision.gameObject.GetComponent<PlayerController>();
         if (other == null || !other.IsAnchored || other.CurrentAnchor != anchoredAt) return;
 
-        // 只让 instanceID 小的一方处理，避免双方重复弹
+        // 只让 instanceID 小的一方处理，避免双方重复
         if (GetInstanceID() > other.GetInstanceID()) return;
 
         Vector2 normal = anchoredAt.GetSurfaceNormal(surfaceT);
@@ -403,7 +427,6 @@ public class PlayerController : MonoBehaviour
         surfaceT -= sign * push;
         other.BumpOnSurface(sign * push);
 
-        Debug.Log($"[Bumper] ★ 弹开！{name} ↔ {other.name}, push={push:F2}");
         spriteFlash?.Flash();
         cameraShake?.Shake(0.3f);
     }
