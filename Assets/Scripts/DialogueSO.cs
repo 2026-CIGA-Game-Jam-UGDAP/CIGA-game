@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Events;
 
 /// <summary>
 /// 单行对话数据
@@ -6,7 +7,7 @@ using UnityEngine;
 [System.Serializable]
 public struct DialogueLine
 {
-    [Tooltip("说话角色名")]
+    [Tooltip("说话角色名，留空=旁白/教程（隐藏立绘+名字，文本居中）")]
     public string speakerName;
 
     [TextArea(2, 5)]
@@ -37,4 +38,12 @@ public class DialogueSO : ScriptableObject
 
     [Tooltip("启用立绘进出场动画（DOTween 淡入淡出）")]
     public bool useAnimation;
+
+    [Header("标记")]
+    [Tooltip("是否需要 CG 演出（仅标记，暂不实现逻辑）")]
+    public bool needsCG;
+
+    [Header("事件")]
+    [Tooltip("对话结束后触发。可拖 GameManager 的方法来推进游戏状态")]
+    public UnityEvent onComplete;
 }

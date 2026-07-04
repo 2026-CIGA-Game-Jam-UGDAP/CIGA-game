@@ -54,14 +54,16 @@ public class DialogueManager : MonoBehaviour
     DialogueSO currentDialogue;
     int currentLineIndex;
     bool lineFullyShown; // 当前行打字机是否播完
+    TMPro.TextAlignmentOptions defaultAlignment; // 对话文本默认对齐，旁白时临时改居中
 
     void Awake()
     {
         Instance = this;
         dialoguePanel.SetActive(false);
+        defaultAlignment = dialogueText.alignment;
     }
 
-    /// <summary>DialogueTrigger 调用，开始一段对话</summary>
+    /// <summary>GameManager 或其他脚本调用，开始一段对话</summary>
     public void StartDialogue(DialogueSO dialogue)
     {
         if (dialogue == null || dialogue.lines.Length == 0)
@@ -100,8 +102,21 @@ public class DialogueManager : MonoBehaviour
     {
         lineFullyShown = false;
 
-        // 立绘
-        UpdatePortraits(line);
+        bool isNarration = string.IsNullOrEmpty(line.speakerName);
+
+        // ★ 旁白/教程模式：隐藏名字和立绘，文本居中
+        speakerNameText.gameObject.SetActive(!isNarration);
+        if (isNarration)
+        {
+            leftPortraitGo.SetActive(false);
+            rightPortraitGo.SetActive(false);
+            dialogueText.alignment = TMPro.TextAlignmentOptions.Center;
+        }
+        else
+        {
+            dialogueText.alignment = defaultAlignment;
+            UpdatePortraits(line);
+        }
 
         // 名字
         speakerNameText.text = line.speakerName;
@@ -173,8 +188,16 @@ public class DialogueManager : MonoBehaviour
         leftPortraitGo.SetActive(false);
         rightPortraitGo.SetActive(false);
 
+        // 恢复名字显示（旁白模式会隐藏）
+        speakerNameText.gameObject.SetActive(true);
+        dialogueText.alignment = defaultAlignment;
+
         Time.timeScale = 1f;
+
+        // ★ 触发 SO 上的 UnityEvent，推进游戏状态
+        var done = currentDialogue;
         currentDialogue = null;
+        done?.onComplete?.Invoke();
     }
 
     /// <summary>更新左右立绘显示</summary>

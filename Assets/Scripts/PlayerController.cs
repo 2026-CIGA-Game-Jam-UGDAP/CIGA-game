@@ -1,5 +1,4 @@
 using UnityEngine;
-using DG.Tweening;
 
 /// <summary>
 /// 太空惯性移动 —— 无重力漂浮 + 喷气背包。
@@ -15,14 +14,12 @@ public class PlayerController : MonoBehaviour
     public const KeyCode P1_JetUp      = KeyCode.W;
     public const KeyCode P1_JetLeft    = KeyCode.A;
     public const KeyCode P1_JetRight   = KeyCode.D;
-    public const KeyCode P1_Transfer   = KeyCode.F;
     public const KeyCode P1_Snap       = KeyCode.LeftShift;
 
     // P2
     public const KeyCode P2_JetUp      = KeyCode.UpArrow;
     public const KeyCode P2_JetLeft    = KeyCode.LeftArrow;
     public const KeyCode P2_JetRight   = KeyCode.RightArrow;
-    public const KeyCode P2_Transfer   = KeyCode.Keypad0;
     public const KeyCode P2_Snap       = KeyCode.Return;
 
     // 通用
@@ -51,8 +48,6 @@ public class PlayerController : MonoBehaviour
     [SerializeField] float maxEnergy = 6f;
     [Tooltip("持续喷气时每秒消耗的能量")]
     [SerializeField] float jetEnergyDrainRate = 2f;
-    [Tooltip("最大可传输段数（单次按住上限）")]
-    [SerializeField] float maxTransferSegments = 3f;
     float currentEnergy;
 
     // ★ 持续喷气：FixedUpdate 中直接用 GetKey 读取，每物理帧施加连续推力
@@ -70,13 +65,8 @@ public class PlayerController : MonoBehaviour
     [Header("队友交互")]
     [Tooltip("拖入另一个玩家的 PlayerController 引用")]
     public PlayerController otherPlayer;
-    [Tooltip("按住传输键时每秒传给队友的能量")]
-    [SerializeField] float transferRate = 3f;
-    [Tooltip("绳索控制器引用（传输时改变绳子颜色）")]
+    [Tooltip("绳索控制器引用")]
     [SerializeField] RopeController ropeController;
-
-    /// <summary>当前这次按住已传输的段数（松手清零）</summary>
-    float transferredThisHold;
 
     [Header("音效")]
     [Tooltip("推进器 AudioSource（挂在 Player 上，用于循环喷射音效）")]
@@ -107,6 +97,8 @@ public class PlayerController : MonoBehaviour
     float surfaceT;           // 玩家在表面上的当前距离（沿周长，圆和多边形统一）
     float smoothedAngle;      // 平滑后的当前旋转角度（度），用于 LerpAngle
     bool wasJetting;          // 上一帧是否喷气，用于检测推进器音效 Start/Stop
+    bool jetpackNotified;     // 是否已通知 GameManager 喷气
+    GameManager gm;           // 缓存引用
 
     // ---- 生命周期 ----
 
@@ -147,6 +139,8 @@ public class PlayerController : MonoBehaviour
             }
         }
 
+        gm = FindObjectOfType<GameManager>();
+
         spawnBounce?.Play();
     }
 
@@ -156,37 +150,6 @@ public class PlayerController : MonoBehaviour
         if (GameManager.IsInitializing || DialogueManager.IsActive) return;
 
         // ★ 持续喷气：FixedUpdate 中直接读取 GetKey，这里不需要额外处理
-
-        if (otherPlayer == null) return;
-
-        // ★ 能量传输：按住给队友传能量（段数制，单次按住有上限）
-        KeyCode transferKey = playerIndex == 0 ? P1_Transfer : P2_Transfer;
-        bool holdingTransfer = Input.GetKey(transferKey);
-        bool transferredThisFrame = false;
-
-        if (holdingTransfer && currentEnergy > 0f && transferredThisHold < maxTransferSegments)
-        {
-            float amount = transferRate * Time.deltaTime;
-            amount = Mathf.Min(amount, currentEnergy);
-            amount = Mathf.Min(amount, maxTransferSegments - transferredThisHold);
-            float space = otherPlayer.MaxEnergy - otherPlayer.CurrentEnergy;
-            if (space > 0f)
-            {
-                amount = Mathf.Min(amount, space);
-                currentEnergy -= amount;
-                transferredThisHold += amount;
-                otherPlayer.AddEnergy(amount);
-                transferredThisFrame = true;
-            }
-        }
-
-        // 传输特效：只在能量实际流动时变色
-        if (ropeController != null)
-            ropeController.SetTransferEffect(transferredThisFrame);
-
-        // 松手重置传输计数
-        if (!holdingTransfer)
-            transferredThisHold = 0f;
 
         UpdateAnimator();
 
@@ -292,6 +255,13 @@ public class PlayerController : MonoBehaviour
         }
 
         IsJetting = jetting;
+
+        // ★ 首次喷气通知 GameManager（对话条件用）
+        if (jetting && !jetpackNotified)
+        {
+            jetpackNotified = true;
+            if (gm != null) gm.OnPlayerJetpacked(playerIndex);
+        }
 
         // ★ 不再硬限速：jetForce 决定推力，linearDrag 自然限速。调 jetForce 直观可感
     }
@@ -486,7 +456,7 @@ public class PlayerController : MonoBehaviour
             surfaceT += deltaT;
     }
 
-    /// <summary>拾取零件或队友传输时调用</summary>
+    /// <summary>拾取能量零件时调用</summary>
     public void AddEnergy(float amount)
     {
         currentEnergy = Mathf.Min(maxEnergy, currentEnergy + amount);
@@ -572,6 +542,9 @@ public class PlayerController : MonoBehaviour
         isFlyingToAnchor = false;
         isAnchored = true;
 
+        // ★ 吸附通知 GameManager（对话条件用）
+        if (gm != null) gm.OnPlayerAttached(playerIndex);
+
         // ★ 忽略碰撞
         IgnoreSurfaceCollision(anchor, true);
 
@@ -651,6 +624,9 @@ public class PlayerController : MonoBehaviour
 
         isFlyingToAnchor = false;
         isAnchored = true;
+
+        // ★ 吸附通知 GameManager（对话条件用）
+        if (gm != null) gm.OnPlayerAttached(playerIndex);
 
         // ★ 忽略玩家与表面非 trigger collider 的物理碰撞，防止物理引擎推歪/推倒玩家
         IgnoreSurfaceCollision(anchor, true);

@@ -65,6 +65,16 @@ public class GameManager : MonoBehaviour
     [Header("暂停菜单")]
     public PauseMenu pauseMenu;
 
+    [Header("对话系统")]
+    [Tooltip("关卡进入时自动播放的对话")]
+    public DialogueSO enterDialogue;
+    [Tooltip("两个玩家都喷气后播放的对话")]
+    public DialogueSO afterJetpackDialogue;
+    [Tooltip("两个玩家都吸附后播放的对话")]
+    public DialogueSO afterAttachDialogue;
+    [Tooltip("陨石撞击后播放的对话")]
+    public DialogueSO afterMeteorDialogue;
+
     [Header("重来效果")]
     [Tooltip("全屏黑色遮罩 Image（用于淡入淡出）")]
     public Image fadeImage;
@@ -74,11 +84,30 @@ public class GameManager : MonoBehaviour
     bool resetting;
     bool shipAnimating;
 
+    // 对话调度状态
+    bool enterDialogueReady;
+    bool enterDialoguePlayed;
+    bool jetpackDialogueTriggered;
+    bool attachDialogueTriggered;
+    bool meteorDialogueTriggered;
+
+    // 玩家操作标志（其他脚本设置）
+    [System.NonSerialized] public bool player1Jetpacked;
+    [System.NonSerialized] public bool player2Jetpacked;
+    [System.NonSerialized] public bool player1Attached;
+    [System.NonSerialized] public bool player2Attached;
+    [System.NonSerialized] public bool meteorImpactTriggered;
+
     /// <summary>开局初始化中，其他脚本读这个禁用输入/物理</summary>
     public static bool IsInitializing { get; private set; }
 
+    /// <summary>全局单例，方便其他脚本调对话方法</summary>
+    public static GameManager Instance { get; private set; }
+
     void Start()
     {
+        Instance = this;
+
         // 初始化 HUD
         if (partHUD != null)
             partHUD.SetDisplayQuiet(0, totalGoalPickups);
@@ -113,6 +142,10 @@ public class GameManager : MonoBehaviour
             if (player2 != null && !player2.IsAnchored)
                 player2.AttachToAnchor(shipAnchor, autoSnapSpeed);
         }
+
+        // ★ 等一帧再允许对话触发（避免跟淡入动画抢）
+        yield return null;
+        enterDialogueReady = true;
     }
 
     void Update()
@@ -133,6 +166,8 @@ public class GameManager : MonoBehaviour
         //     ResetLevel();
         // if (player2 != null && player2.transform.position.y < deathY)
         //     ResetLevel();
+
+        CheckDialogueTriggers();
     }
 
     /// <summary>ShipDockTrigger 调用：玩家进入对接区</summary>
@@ -264,5 +299,67 @@ public class GameManager : MonoBehaviour
 
         if (!string.IsNullOrEmpty(nextSceneName))
             SceneManager.LoadScene(nextSceneName);
+    }
+
+    // ==================== 对话调度 ====================
+
+    /// <summary>每帧检查条件，触发对应对话</summary>
+    void CheckDialogueTriggers()
+    {
+        if (DialogueManager.Instance == null || DialogueManager.IsActive) return;
+        if (!enterDialogueReady) return;
+
+        // 1. 关卡进入对话（自动触发一次）
+        if (!enterDialoguePlayed && enterDialogue != null)
+        {
+            enterDialoguePlayed = true;
+            DialogueManager.Instance.StartDialogue(enterDialogue);
+            return;
+        }
+
+        // 2. 喷气背包对话（两个人都喷气后触发）
+        if (enterDialoguePlayed && !jetpackDialogueTriggered &&
+            player1Jetpacked && player2Jetpacked && afterJetpackDialogue != null)
+        {
+            jetpackDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterJetpackDialogue);
+            return;
+        }
+
+        // 3. 吸附对话（两个人都吸附后触发）
+        if (jetpackDialogueTriggered && !attachDialogueTriggered &&
+            player1Attached && player2Attached && afterAttachDialogue != null)
+        {
+            attachDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterAttachDialogue);
+            return;
+        }
+
+        // 4. 陨石对话
+        if (!meteorDialogueTriggered && meteorImpactTriggered && afterMeteorDialogue != null)
+        {
+            meteorDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterMeteorDialogue);
+        }
+    }
+
+    /// <summary>PlayerController 调用：玩家使用了喷气背包</summary>
+    public void OnPlayerJetpacked(int playerIndex)
+    {
+        if (playerIndex == 0) player1Jetpacked = true;
+        else player2Jetpacked = true;
+    }
+
+    /// <summary>PlayerController 调用：玩家吸附到了表面</summary>
+    public void OnPlayerAttached(int playerIndex)
+    {
+        if (playerIndex == 0) player1Attached = true;
+        else player2Attached = true;
+    }
+
+    /// <summary>MeteorManager 或其他脚本调用：陨石撞击发生</summary>
+    public void OnMeteorImpact()
+    {
+        meteorImpactTriggered = true;
     }
 }
