@@ -30,6 +30,9 @@ public class RopeController : MonoBehaviour
     [Header("配置")]
     [Tooltip("绳索物理参数配置（RopeConfig 资产）")]
     public RopeConfig config;
+    [Tooltip("绳长倍率：1=Obi 实际长度，>1 更松，<1 更紧")]
+    [Range(0.5f, 3f)]
+    public float ropeLengthMultiplier = 1f;
 
     [Header("事件")]
     [Tooltip("GameManager 引用，断裂时回调 OnRopeBreak()")]
@@ -45,6 +48,9 @@ public class RopeController : MonoBehaviour
 
     // ★ 定长绳长：Start 初始化后不再改变
     float fixedRopeLength;
+
+    /// <summary>定长绳长（Start 初始化后不再改变），供 PlayerController 做吸附移动约束</summary>
+    public float FixedRopeLength => fixedRopeLength;
 
     // 调参脏标记
     float lastAppliedBendingStiffness = -1f;
@@ -113,11 +119,9 @@ public class RopeController : MonoBehaviour
         // === Pin 约束：粒子 0 → P1，粒子 N → P2 ===
         SetupPins();
 
-        // ★ 定长绳长：精确匹配玩家间距，之后永不改变
-        float playerDist = (rb1 != null && rb2 != null)
-            ? Vector3.Distance(rb1.transform.position, rb2.transform.position)
-            : 5f;
-        fixedRopeLength = playerDist;
+        // ★ 定长绳长：Obi 物理 rest length × 手动倍率
+        fixedRopeLength = (rope.RestLength > 0f ? rope.RestLength : 5f) * ropeLengthMultiplier;
+        Debug.Log($"[RopeController] 定长绳长 = {fixedRopeLength:F2}m (Obi {rope.RestLength:F2}m × {ropeLengthMultiplier:F2})");
 
         // ★ 等绳子在冻结的玩家之间自然就位（Obi 需要几帧物理步）
         yield return new WaitForSeconds(0.2f);

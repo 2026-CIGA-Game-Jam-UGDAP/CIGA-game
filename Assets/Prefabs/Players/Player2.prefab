@@ -5091,7 +5091,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 2.79, y: 0.12, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 0.5503, y: 0.5503, z: 0.5503}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 4142949701943974445}
@@ -5240,12 +5240,12 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   playerIndex: 1
-  jetForce: 6
+  jetForce: 20
   maxSpeed: 60
   moveSpeed: 3
   linearDrag: 1.5
-  maxEnergy: 6
-  energyPerBurst: 1
+  maxEnergy: 10
+  jetEnergyDrainRate: 1
   maxTransferSegments: 3
   otherPlayer: {fileID: 0}
   transferRate: 30

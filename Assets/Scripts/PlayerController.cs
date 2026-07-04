@@ -46,14 +46,13 @@ public class PlayerController : MonoBehaviour
     [Header("能量")]
     [Tooltip("能量段数上限")]
     [SerializeField] float maxEnergy = 6f;
-    [Tooltip("每次喷气消耗的段数")]
-    [SerializeField] float energyPerBurst = 1f;
+    [Tooltip("持续喷气时每秒消耗的能量")]
+    [SerializeField] float jetEnergyDrainRate = 2f;
     [Tooltip("最大可传输段数（单次按住上限）")]
     [SerializeField] float maxTransferSegments = 3f;
     float currentEnergy;
 
-    // ★ 瞬时喷气：Update 捕获按下的方向，FixedUpdate 消费后清零
-    Vector2 pendingJetImpulse;
+    // ★ 持续喷气：FixedUpdate 中直接用 GetKey 读取，每物理帧施加连续推力
 
     /// <summary>能量百分比 0~1，给 UI Image fill 用</summary>
     public float EnergyPercent => maxEnergy > 0f ? currentEnergy / maxEnergy : 0f;
@@ -97,6 +96,7 @@ public class PlayerController : MonoBehaviour
     bool isAnchored;
     bool isFlyingToAnchor;
     AnchorPoint anchoredAt;
+    PolyAnchorPoint polyAnchoredAt;
     float surfaceT;           // 玩家在表面上的当前距离（沿周长，圆和多边形统一）
     float smoothedAngle;      // 平滑后的当前旋转角度（度），用于 LerpAngle
 
@@ -129,8 +129,7 @@ public class PlayerController : MonoBehaviour
         // 初始化/对话中禁用所有输入
         if (GameManager.IsInitializing || DialogueManager.IsActive) return;
 
-        // ★ 瞬时喷气：在 Update 捕获 GetKeyDown，避免 FixedUpdate 丢帧
-        pendingJetImpulse += GetJetInputDown();
+        // ★ 持续喷气：FixedUpdate 中直接读取 GetKey，这里不需要额外处理
 
         if (otherPlayer == null) return;
 
@@ -200,7 +199,9 @@ public class PlayerController : MonoBehaviour
             }
 
             // ★ 用锚点的方向符号：+1 表示 t 增加 = 右（顺时针），-1 表示需要反转
-            float moveDir = rawHorizontal * anchoredAt.MoveDirectionSign;
+            float moveDir = rawHorizontal * AnchorMoveSign;
+
+            Vector2 currentPos = AnchorSurfacePoint(surfaceT);
 
             if (Mathf.Abs(moveDir) > 0.01f)
             {
@@ -212,36 +213,64 @@ public class PlayerController : MonoBehaviour
                 IsJetting = false;
             }
 
-            Vector2 targetPos = anchoredAt.GetSurfacePoint(surfaceT);
-            Vector2 normal = anchoredAt.GetSurfaceNormal(surfaceT);
+            Vector2 targetPos = AnchorSurfacePoint(surfaceT);
+
+            // ★ 绳子约束：只在移动远离队友时限制，同向走不限制
+            if (ropeController != null && otherPlayer != null)
+            {
+                float ropeLen = ropeController.FixedRopeLength;
+                if (ropeLen > 0f)
+                {
+                    Vector2 otherPos = otherPlayer.transform.position;
+                    float curDist = Vector2.Distance(currentPos, otherPos);
+                    float newDist = Vector2.Distance(targetPos, otherPos);
+                    // 只有拉大距离且超出绳长时才 clamp（同向走不会拉大距离）
+                    if (newDist > ropeLen && newDist > curDist)
+                    {
+                        Vector2 dir = (targetPos - otherPos).normalized;
+                        Vector2 clampedPos = otherPos + dir * ropeLen;
+                        surfaceT = AnchorClosestT(clampedPos);
+                        targetPos = AnchorSurfacePoint(surfaceT);
+                    }
+                }
+            }
+
+            Vector2 normal = AnchorSurfaceNormal(surfaceT);
             float targetAngle = Mathf.Atan2(normal.y, normal.x) * Mathf.Rad2Deg - 90f;
 
             smoothedAngle = Mathf.LerpAngle(smoothedAngle, targetAngle, 20f * Time.fixedDeltaTime);
 
-            rb.MovePosition(targetPos);
-            rb.velocity = Vector2.zero;
-            rb.MoveRotation(smoothedAngle);
+            // ★ 防御：NaN 不入物理体
+            if (!float.IsNaN(targetPos.x) && !float.IsNaN(targetPos.y))
+            {
+                rb.MovePosition(targetPos);
+                rb.velocity = Vector2.zero;
+            }
+            if (!float.IsNaN(smoothedAngle))
+            {
+                rb.MoveRotation(smoothedAngle);
+            }
 
             return;
         }
 
-        // ★ 自由飞行：瞬时喷气（按一下 = 一次冲量，不按住持续施力）
-        Vector2 input = pendingJetImpulse;
-        pendingJetImpulse = Vector2.zero;
+        // ★ 自由飞行：持续喷气（按住 = 持续施力 + 持续消耗能量）
+        Vector2 input = GetJetInput();
 
-        bool jetting = input.sqrMagnitude > 0.01f && currentEnergy >= energyPerBurst;
+        bool jetting = input.sqrMagnitude > 0.01f && currentEnergy > 0f;
 
         if (jetting)
         {
-            currentEnergy -= energyPerBurst;
+            float drain = jetEnergyDrainRate * Time.fixedDeltaTime;
+            currentEnergy -= drain;
             if (currentEnergy < 0f) currentEnergy = 0f;
 
-            rb.AddForce(input.normalized * jetForce, ForceMode2D.Impulse);
+            rb.AddForce(input.normalized * jetForce, ForceMode2D.Force);
         }
 
         IsJetting = jetting;
 
-        // ★ 不再硬限速：jetForce 决定每次推力，linearDrag 自然限速。调 jetForce 直观可感
+        // ★ 不再硬限速：jetForce 决定推力，linearDrag 自然限速。调 jetForce 直观可感
     }
 
     void UpdateAnimator()
@@ -270,22 +299,22 @@ public class PlayerController : MonoBehaviour
 
     // ---- 输入 (Module 2: 四方向喷气) ----
 
-    /// <summary>瞬时喷气输入：按下那一帧才返回方向（星球表面不用这个）</summary>
-    Vector2 GetJetInputDown()
+    /// <summary>持续喷气输入：按住期间每帧返回方向（星球表面不用这个）</summary>
+    Vector2 GetJetInput()
     {
         Vector2 raw = Vector2.zero;
 
         if (playerIndex == 0)
         {
-            if (Input.GetKeyDown(P1_JetUp))    raw.y += 1;
-            if (Input.GetKeyDown(P1_JetLeft))  raw.x -= 1;
-            if (Input.GetKeyDown(P1_JetRight)) raw.x += 1;
+            if (Input.GetKey(P1_JetUp))    raw.y += 1;
+            if (Input.GetKey(P1_JetLeft))  raw.x -= 1;
+            if (Input.GetKey(P1_JetRight)) raw.x += 1;
         }
         else
         {
-            if (Input.GetKeyDown(P2_JetUp))    raw.y += 1;
-            if (Input.GetKeyDown(P2_JetLeft))  raw.x -= 1;
-            if (Input.GetKeyDown(P2_JetRight)) raw.x += 1;
+            if (Input.GetKey(P2_JetUp))    raw.y += 1;
+            if (Input.GetKey(P2_JetLeft))  raw.x -= 1;
+            if (Input.GetKey(P2_JetRight)) raw.x += 1;
         }
 
         return RawToWorldDir(raw);
@@ -303,8 +332,15 @@ public class PlayerController : MonoBehaviour
 
     // ---- Module 4: 锚点吸附（切换行为）----
 
-    /// <summary>锚点调用：平滑飞到球表面最近点，之后在球表面切向移动</summary>
+    /// <summary>锚点调用：平滑飞到圆表面最近点，之后在表面切向移动</summary>
     public void AttachToAnchor(AnchorPoint anchor, float speed)
+    {
+        if (!isAnchored && !isFlyingToAnchor)
+            StartCoroutine(AttachRoutine(anchor, speed));
+    }
+
+    /// <summary>锚点调用：平滑飞到多边形表面最近点，之后在表面切向移动</summary>
+    public void AttachToAnchor(PolyAnchorPoint anchor, float speed)
     {
         if (!isAnchored && !isFlyingToAnchor)
             StartCoroutine(AttachRoutine(anchor, speed));
@@ -315,6 +351,7 @@ public class PlayerController : MonoBehaviour
     {
         isAnchored = false;
         anchoredAt = null;
+        polyAnchoredAt = null;
 
         // ★ 脱离后重置旋转为 0，重新锁定 Z 旋转，恢复自由飞行姿态
         if (rb != null)
@@ -326,10 +363,18 @@ public class PlayerController : MonoBehaviour
 
     /// <summary>是否已被锚点吸附</summary>
     public bool IsAnchored => isAnchored;
-    /// <summary>当前吸附的锚点（null 表示未吸附）</summary>
-    public AnchorPoint CurrentAnchor => anchoredAt;
+    /// <summary>当前吸附的锚点（用于碰碰车判断是否同锚点，返回 object 做引用比较）</summary>
+    public object CurrentAnchor => (object)anchoredAt ?? polyAnchoredAt;
     /// <summary>当前在表面上的位置 t 值</summary>
     public float SurfaceT => surfaceT;
+
+    // ---- 表面接口分发（AnchorPoint 和 PolyAnchorPoint 方法名一致，手动分发） ----
+    float AnchorSurfaceLength => polyAnchoredAt != null ? polyAnchoredAt.SurfaceLength : (anchoredAt != null ? anchoredAt.SurfaceLength : 0f);
+    float AnchorMoveSign => polyAnchoredAt != null ? polyAnchoredAt.MoveDirectionSign : (anchoredAt != null ? anchoredAt.MoveDirectionSign : -1f);
+    Vector2 AnchorSurfacePoint(float t) => polyAnchoredAt != null ? polyAnchoredAt.GetSurfacePoint(t) : anchoredAt.GetSurfacePoint(t);
+    Vector2 AnchorSurfaceNormal(float t) => polyAnchoredAt != null ? polyAnchoredAt.GetSurfaceNormal(t) : anchoredAt.GetSurfaceNormal(t);
+    float AnchorClosestT(Vector3 pos) => polyAnchoredAt != null ? polyAnchoredAt.FindClosestSurfaceT(pos) : anchoredAt.FindClosestSurfaceT(pos);
+    Vector2 AnchorClosestPoint(Vector3 pos) => polyAnchoredAt != null ? polyAnchoredAt.GetClosestSurfacePoint(pos) : anchoredAt.GetClosestSurfacePoint(pos);
 
     /// <summary>沿表面推开一段距离（碰碰车弹开用）</summary>
     public void BumpOnSurface(float deltaT)
@@ -346,6 +391,13 @@ public class PlayerController : MonoBehaviour
 
     System.Collections.IEnumerator AttachRoutine(AnchorPoint anchor, float speed)
     {
+        // ★ 防御：speed 无效则直接吸附到位
+        if (speed <= 0f || float.IsNaN(speed))
+        {
+            Debug.LogWarning($"[PlayerController] AttachRoutine: speed={speed} 无效，使用瞬间吸附");
+            speed = 9999f;
+        }
+
         // ★ 目标：表面上最近点（圆/多边形统一用 GetClosestSurfacePoint）
         Vector3 target = anchor.GetClosestSurfacePoint(transform.position);
 
@@ -354,6 +406,14 @@ public class PlayerController : MonoBehaviour
         float targetT = anchor.FindClosestSurfaceT(target);
         Vector2 targetNormal = anchor.GetSurfaceNormal(targetT);
         float targetAngle = Mathf.Atan2(targetNormal.y, targetNormal.x) * Mathf.Rad2Deg - 90f;
+
+        // ★ 防御：NaN 检查（当 anchor 半径为 0 时 surface 方法可能返回 NaN）
+        if (float.IsNaN(target.x) || float.IsNaN(target.y) || float.IsNaN(startAngle) || float.IsNaN(targetAngle))
+        {
+            Debug.LogError($"[PlayerController] {name} AttachRoutine: 计算含 NaN。target={target}, startAngle={startAngle}, targetAngle={targetAngle}, targetNormal={targetNormal}");
+            isFlyingToAnchor = false;
+            yield break;
+        }
 
         // ★ 飞行阶段：不处理物理，协程驱动位置
         isFlyingToAnchor = true;
@@ -369,19 +429,30 @@ public class PlayerController : MonoBehaviour
             t += Time.deltaTime / duration;
             float eased = Mathf.SmoothStep(0f, 1f, t);
             Vector3 pos = Vector3.Lerp(startPos, target, eased);
-            if (rb != null) rb.MovePosition(pos);
-            else transform.position = pos;
+
+            // ★ 防御：NaN 不入物理体
+            if (!float.IsNaN(pos.x) && !float.IsNaN(pos.y))
+            {
+                if (rb != null) rb.MovePosition(pos);
+                else transform.position = pos;
+            }
 
             // ★ 飞行中同步旋转到目标法线
             float rot = Mathf.LerpAngle(startAngle, targetAngle, eased);
-            if (rb != null) rb.MoveRotation(rot);
+            if (!float.IsNaN(rot))
+            {
+                if (rb != null) rb.MoveRotation(rot);
+            }
 
             yield return null;
         }
 
         // ★ 到达后进入表面移动模式
-        if (rb != null) rb.MovePosition(target);
-        else transform.position = target;
+        if (!float.IsNaN(target.x) && !float.IsNaN(target.y))
+        {
+            if (rb != null) rb.MovePosition(target);
+            else transform.position = target;
+        }
         if (rb != null) rb.velocity = Vector2.zero;
 
         anchoredAt = anchor;
@@ -393,7 +464,7 @@ public class PlayerController : MonoBehaviour
         Vector2 initNormal = anchor.GetSurfaceNormal(surfaceT);
         smoothedAngle = Mathf.Atan2(initNormal.y, initNormal.x) * Mathf.Rad2Deg - 90f;
         // 立即应用旋转，不等下一帧 FixedUpdate
-        if (rb != null) rb.MoveRotation(smoothedAngle);
+        if (!float.IsNaN(smoothedAngle) && rb != null) rb.MoveRotation(smoothedAngle);
 
         // ★ 不锁 Z 轴：允许玩家随表面旋转自由翻转
         if (rb != null)
@@ -407,6 +478,84 @@ public class PlayerController : MonoBehaviour
         cameraShake?.Shake(0.5f);
     }
 
+    System.Collections.IEnumerator AttachRoutine(PolyAnchorPoint anchor, float speed)
+    {
+        // ★ 防御：speed 无效则直接吸附到位
+        if (speed <= 0f || float.IsNaN(speed))
+        {
+            Debug.LogWarning($"[PlayerController] AttachRoutine(Poly): speed={speed} 无效，使用瞬间吸附");
+            speed = 9999f;
+        }
+
+        Vector3 target = anchor.GetClosestSurfacePoint(transform.position);
+
+        float startAngle = rb != null ? rb.rotation : transform.eulerAngles.z;
+        float targetT = anchor.FindClosestSurfaceT(target);
+        Vector2 targetNormal = anchor.GetSurfaceNormal(targetT);
+        float targetAngle = Mathf.Atan2(targetNormal.y, targetNormal.x) * Mathf.Rad2Deg - 90f;
+
+        // ★ 防御：NaN 检查
+        if (float.IsNaN(target.x) || float.IsNaN(target.y) || float.IsNaN(startAngle) || float.IsNaN(targetAngle))
+        {
+            Debug.LogError($"[PlayerController] {name} AttachRoutine(Poly): 计算含 NaN。target={target}, startAngle={startAngle}, targetAngle={targetAngle}, targetNormal={targetNormal}");
+            isFlyingToAnchor = false;
+            yield break;
+        }
+
+        isFlyingToAnchor = true;
+        if (rb != null) rb.velocity = Vector2.zero;
+
+        Vector3 startPos = transform.position;
+        float dist = Vector3.Distance(startPos, target);
+        float duration = Mathf.Max(0.2f, dist / speed);
+
+        float t = 0f;
+        while (t < 1f)
+        {
+            t += Time.deltaTime / duration;
+            float eased = Mathf.SmoothStep(0f, 1f, t);
+            Vector3 pos = Vector3.Lerp(startPos, target, eased);
+
+            if (!float.IsNaN(pos.x) && !float.IsNaN(pos.y))
+            {
+                if (rb != null) rb.MovePosition(pos);
+                else transform.position = pos;
+            }
+
+            float rot = Mathf.LerpAngle(startAngle, targetAngle, eased);
+            if (!float.IsNaN(rot))
+            {
+                if (rb != null) rb.MoveRotation(rot);
+            }
+
+            yield return null;
+        }
+
+        if (!float.IsNaN(target.x) && !float.IsNaN(target.y))
+        {
+            if (rb != null) rb.MovePosition(target);
+            else transform.position = target;
+        }
+        if (rb != null) rb.velocity = Vector2.zero;
+
+        polyAnchoredAt = anchor;
+
+        Vector2 attachPos = rb != null ? rb.position : (Vector2)transform.position;
+        surfaceT = anchor.FindClosestSurfaceT(attachPos);
+        Vector2 initNormal = anchor.GetSurfaceNormal(surfaceT);
+        smoothedAngle = Mathf.Atan2(initNormal.y, initNormal.x) * Mathf.Rad2Deg - 90f;
+        if (!float.IsNaN(smoothedAngle) && rb != null) rb.MoveRotation(smoothedAngle);
+
+        if (rb != null)
+            rb.constraints &= ~RigidbodyConstraints2D.FreezeRotation;
+
+        isFlyingToAnchor = false;
+        isAnchored = true;
+
+        landDust?.Play();
+        cameraShake?.Shake(0.5f);
+    }
+
     // ---- 碰碰车弹开 ----
 
     void OnCollisionEnter2D(Collision2D collision)
@@ -414,12 +563,13 @@ public class PlayerController : MonoBehaviour
         if (!isAnchored) return;
 
         PlayerController other = collision.gameObject.GetComponent<PlayerController>();
-        if (other == null || !other.IsAnchored || other.CurrentAnchor != anchoredAt) return;
+        object myAnchor = (object)anchoredAt ?? polyAnchoredAt;
+        if (other == null || !other.IsAnchored || other.CurrentAnchor != myAnchor) return;
 
         // 只让 instanceID 小的一方处理，避免双方重复
         if (GetInstanceID() > other.GetInstanceID()) return;
 
-        Vector2 normal = anchoredAt.GetSurfaceNormal(surfaceT);
+        Vector2 normal = AnchorSurfaceNormal(surfaceT);
         Vector2 toOther = (other.transform.position - transform.position).normalized;
         Vector2 tangent = new Vector2(-normal.y, normal.x);
         float dot = Vector2.Dot(toOther, tangent);
