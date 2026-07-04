@@ -16,6 +16,10 @@ public class DialogueManager : MonoBehaviour
     /// <summary>对话是否正在播放。其他脚本（如 PlayerController）读这个来禁用输入。</summary>
     public static bool IsActive => Instance != null && Instance.dialoguePanel.activeSelf;
 
+    [Header("角色配置")]
+    [Tooltip("所有角色配置（从 CharacterConfig asset 拖入）")]
+    public CharacterConfig[] characterConfigs;
+
     [Header("面板根节点")]
     [Tooltip("对话面板根节点（包含所有对话 UI）")]
     public GameObject dialoguePanel;
@@ -114,7 +118,11 @@ public class DialogueManager : MonoBehaviour
     {
         lineFullyShown = false;
 
-        bool isNarration = string.IsNullOrEmpty(line.speakerName);
+        // ★ 消毒文本：替换字体可能不支持的字符，防止乱码
+        string safeText = TextSanitizer.SanitizeString(line.text);
+        string safeSpeaker = TextSanitizer.SanitizeString(line.speakerName);
+
+        bool isNarration = string.IsNullOrEmpty(safeSpeaker);
 
         if (isNarration)
         {
@@ -130,10 +138,10 @@ public class DialogueManager : MonoBehaviour
             // ====== 角色对话模式 ======
             dialogueText.alignment = defaultAlignment;
             speakerNameText.gameObject.SetActive(true);
-            speakerNameText.text = line.speakerName;
+            speakerNameText.text = safeSpeaker;
 
-            // 站位：方波=左，其余=右
-            bool isLeft = line.speakerName == "方波";
+            // 站位：从 CharacterConfig 查找，默认右侧
+            bool isLeft = GetCharacterSide(safeSpeaker);
 
             // 大立绘
             UpdateBigPortrait(line.bigPortrait);
@@ -147,13 +155,13 @@ public class DialogueManager : MonoBehaviour
         // 文本
         if (currentDialogue.useTypingEffect && typewriter != null)
         {
-            typewriter.ShowText(line.text);
+            typewriter.ShowText(safeText);
             typewriter.onTextShowed.RemoveAllListeners();
             typewriter.onTextShowed.AddListener(() => OnTypingComplete());
         }
         else
         {
-            dialogueText.text = line.text;
+            dialogueText.text = safeText;
             OnTypingComplete();
         }
     }
@@ -234,7 +242,7 @@ public class DialogueManager : MonoBehaviour
             typewriter.SkipTypewriter();
         else
         {
-            dialogueText.text = currentDialogue.lines[currentLineIndex].text;
+            dialogueText.text = TextSanitizer.SanitizeString(currentDialogue.lines[currentLineIndex].text);
             OnTypingComplete();
         }
     }
@@ -273,6 +281,21 @@ public class DialogueManager : MonoBehaviour
         var done = currentDialogue;
         currentDialogue = null;
         done?.onComplete?.Invoke();
+    }
+
+    /// <summary>从 CharacterConfig 查找角色站位，未找到默认右侧</summary>
+    bool GetCharacterSide(string speakerName)
+    {
+        if (characterConfigs != null)
+        {
+            foreach (var cfg in characterConfigs)
+            {
+                if (cfg != null && cfg.characterName == speakerName)
+                    return cfg.isLeftSide;
+            }
+        }
+        // fallback: 方波=左（兼容旧数据）
+        return speakerName == "方波";
     }
 
     void OnDestroy()

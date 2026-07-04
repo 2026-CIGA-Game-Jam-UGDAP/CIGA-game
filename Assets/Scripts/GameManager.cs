@@ -68,10 +68,22 @@ public class GameManager : MonoBehaviour
     [Header("对话系统")]
     [Tooltip("关卡进入时自动播放的对话")]
     public DialogueSO enterDialogue;
+    [Tooltip("（关卡0）两个玩家都解除吸附后播放的对话")]
+    public DialogueSO afterDetachDialogue;
+    [Tooltip("（关卡0/1）两个玩家都吸附后播放的对话")]
+    public DialogueSO afterAttachDialogue;
+    [Tooltip("（关卡0）两个玩家再次解除吸附后播放的对话（喷气背包教程）")]
+    public DialogueSO afterDetach2Dialogue;
     [Tooltip("两个玩家都喷气后播放的对话")]
     public DialogueSO afterJetpackDialogue;
-    [Tooltip("两个玩家都吸附后播放的对话")]
-    public DialogueSO afterAttachDialogue;
+    [Tooltip("（关卡0）玩家到达外部平台后播放的对话")]
+    public DialogueSO afterExitDialogue;
+    [Tooltip("（关卡0）两个玩家都补充能量后播放的对话")]
+    public DialogueSO afterRechargeDialogue;
+    [Tooltip("（关卡0）两个玩家都到达飞船后播放的对话")]
+    public DialogueSO afterReachShipDialogue;
+    [Tooltip("（关卡1+）收集完所有零件后播放的对话")]
+    public DialogueSO afterCollectDialogue;
     [Tooltip("陨石撞击后播放的对话")]
     public DialogueSO afterMeteorDialogue;
 
@@ -87,8 +99,14 @@ public class GameManager : MonoBehaviour
     // 对话调度状态
     bool enterDialogueReady;
     bool enterDialoguePlayed;
-    bool jetpackDialogueTriggered;
+    bool detachDialogueTriggered;
     bool attachDialogueTriggered;
+    bool detach2DialogueTriggered;
+    bool jetpackDialogueTriggered;
+    bool exitDialogueTriggered;
+    bool rechargeDialogueTriggered;
+    bool reachShipDialogueTriggered;
+    bool collectDialogueTriggered;
     bool meteorDialogueTriggered;
 
     // 玩家操作标志（其他脚本设置）
@@ -97,6 +115,15 @@ public class GameManager : MonoBehaviour
     [System.NonSerialized] public bool player1Attached;
     [System.NonSerialized] public bool player2Attached;
     [System.NonSerialized] public bool meteorImpactTriggered;
+    [System.NonSerialized] public bool player1Recharged;
+    [System.NonSerialized] public bool player2Recharged;
+    [System.NonSerialized] public bool player1ReachedShip;
+    [System.NonSerialized] public bool player2ReachedShip;
+    [System.NonSerialized] public bool playersExitedToPlatform;
+
+    // 玩家解除吸附计数（关卡0区分第一次和第二次解除）
+    int player1DetachCount;
+    int player2DetachCount;
 
     /// <summary>开局初始化中，其他脚本读这个禁用输入/物理</summary>
     public static bool IsInitializing { get; private set; }
@@ -134,13 +161,21 @@ public class GameManager : MonoBehaviour
         if (fadeImage != null)
             yield return fadeImage.DOFade(0f, fadeDuration).WaitForCompletion();
 
-        // ★ 自动吸附到飞船
-        if (autoSnapToShip && shipAnchor != null)
+        // ★ 自动吸附到最近的锚点（不再只吸飞船）
+        if (autoSnapToShip)
         {
             if (player1 != null && !player1.IsAnchored)
-                player1.AttachToAnchor(shipAnchor, autoSnapSpeed);
+            {
+                var nearest = FindNearestAnchor(player1.transform.position);
+                if (nearest != null)
+                    AttachToNearest(player1, nearest);
+            }
             if (player2 != null && !player2.IsAnchored)
-                player2.AttachToAnchor(shipAnchor, autoSnapSpeed);
+            {
+                var nearest = FindNearestAnchor(player2.transform.position);
+                if (nearest != null)
+                    AttachToNearest(player2, nearest);
+            }
         }
 
         // ★ 等一帧再允许对话触发（避免跟淡入动画抢）
@@ -303,7 +338,7 @@ public class GameManager : MonoBehaviour
 
     // ==================== 对话调度 ====================
 
-    /// <summary>每帧检查条件，触发对应对话</summary>
+    /// <summary>每帧检查条件，触发对应对话（顺序链式触发）</summary>
     void CheckDialogueTriggers()
     {
         if (DialogueManager.Instance == null || DialogueManager.IsActive) return;
@@ -317,17 +352,17 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 2. 喷气背包对话（两个人都喷气后触发）
-        if (enterDialoguePlayed && !jetpackDialogueTriggered &&
-            player1Jetpacked && player2Jetpacked && afterJetpackDialogue != null)
+        // 2. 首次解除吸附对话（关卡0：两个人都脱离初始吸附后）
+        if (enterDialoguePlayed && !detachDialogueTriggered &&
+            player1DetachCount >= 1 && player2DetachCount >= 1 && afterDetachDialogue != null)
         {
-            jetpackDialogueTriggered = true;
-            DialogueManager.Instance.StartDialogue(afterJetpackDialogue);
+            detachDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterDetachDialogue);
             return;
         }
 
-        // 3. 吸附对话（两个人都吸附后触发）
-        if (jetpackDialogueTriggered && !attachDialogueTriggered &&
+        // 3. 吸附对话（两个人都吸附后）
+        if (detachDialogueTriggered && !attachDialogueTriggered &&
             player1Attached && player2Attached && afterAttachDialogue != null)
         {
             attachDialogueTriggered = true;
@@ -335,12 +370,104 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 4. 陨石对话
+        // 4. 二次解除吸附对话（关卡0：喷气背包教程前先解除吸附）
+        if (attachDialogueTriggered && !detach2DialogueTriggered &&
+            player1DetachCount >= 2 && player2DetachCount >= 2 && afterDetach2Dialogue != null)
+        {
+            detach2DialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterDetach2Dialogue);
+            return;
+        }
+
+        // 5. 喷气背包对话（两个人都喷气后）
+        if (detach2DialogueTriggered && !jetpackDialogueTriggered &&
+            player1Jetpacked && player2Jetpacked && afterJetpackDialogue != null)
+        {
+            jetpackDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterJetpackDialogue);
+            return;
+        }
+
+        // 6. 到达外部平台对话（关卡0）
+        if (jetpackDialogueTriggered && !exitDialogueTriggered &&
+            playersExitedToPlatform && afterExitDialogue != null)
+        {
+            exitDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterExitDialogue);
+            return;
+        }
+
+        // 7. 补充能量对话（关卡0：两个人都补充能量后）
+        if (exitDialogueTriggered && !rechargeDialogueTriggered &&
+            player1Recharged && player2Recharged && afterRechargeDialogue != null)
+        {
+            rechargeDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterRechargeDialogue);
+            return;
+        }
+
+        // 8. 到达飞船对话（关卡0）
+        if (rechargeDialogueTriggered && !reachShipDialogueTriggered &&
+            player1ReachedShip && player2ReachedShip && afterReachShipDialogue != null)
+        {
+            reachShipDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterReachShipDialogue);
+            return;
+        }
+
+        // 9. 收集完零件对话（关卡1+：部分关卡没有关卡0流程，靠前置 trigger 已默认通过跳到这里）
+        if (!collectDialogueTriggered && IsCollectConditionMet() && afterCollectDialogue != null)
+        {
+            collectDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterCollectDialogue);
+            return;
+        }
+
+        // 10. 陨石对话（随时可触发，不依赖前置链）
         if (!meteorDialogueTriggered && meteorImpactTriggered && afterMeteorDialogue != null)
         {
             meteorDialogueTriggered = true;
             DialogueManager.Instance.StartDialogue(afterMeteorDialogue);
         }
+    }
+
+    /// <summary>
+    /// 检查是否满足收集完零件触发条件：
+    /// 对于有关卡0流程的关卡（rechargeDialogueTriggered=true），需要前置链走完；
+    /// 对于其他关卡，只需要 enterDialoguePlayed 即可（如果有关卡0字段没填则默认通过）。
+    /// </summary>
+    bool IsCollectConditionMet()
+    {
+        // 如果场景中根本没填 afterCollectDialogue，别触发
+        if (afterCollectDialogue == null) return false;
+
+        // 如果填了关卡0的对话字段，说明这是有关卡0教学链的关卡，需要链走完
+        bool hasLevel0Flow = afterDetachDialogue != null || afterRechargeDialogue != null;
+
+        if (hasLevel0Flow)
+        {
+            // 有关卡0链：需要 recharge 对话已触发（或跳过） + 零件全部收集
+            return (rechargeDialogueTriggered || rechargeDialogueTriggeredIfNoAsset()) &&
+                   collectedGoals >= totalGoalPickups;
+        }
+        else
+        {
+            // 没有关卡0链（如 Level1+）：enter 对话播完 + 零件全部收集
+            return enterDialoguePlayed && collectedGoals >= totalGoalPickups;
+        }
+    }
+
+    /// <summary>如果场景中没填 afterRechargeDialogue 资产，视为已触发</summary>
+    bool rechargeDialogueTriggeredIfNoAsset()
+    {
+        return afterRechargeDialogue == null || rechargeDialogueTriggered;
+    }
+
+    /// <summary>PlayerController 调用：玩家解除了吸附</summary>
+    public void OnPlayerDetached(int playerIndex)
+    {
+        if (playerIndex == 0) player1DetachCount++;
+        else player2DetachCount++;
     }
 
     /// <summary>PlayerController 调用：玩家使用了喷气背包</summary>
@@ -357,9 +484,62 @@ public class GameManager : MonoBehaviour
         else player2Attached = true;
     }
 
+    /// <summary>能量补给区 Trigger 调用：玩家补充了能量</summary>
+    public void OnPlayerRecharged(int playerIndex)
+    {
+        if (playerIndex == 0) player1Recharged = true;
+        else player2Recharged = true;
+    }
+
+    /// <summary>飞船对接区 Trigger 调用：玩家到达飞船</summary>
+    public void OnPlayerReachedShip(int playerIndex)
+    {
+        if (playerIndex == 0) player1ReachedShip = true;
+        else player2ReachedShip = true;
+    }
+
+    /// <summary>外部平台 Trigger 调用：玩家到达太空站外部平台</summary>
+    public void OnPlayersExitedToPlatform()
+    {
+        playersExitedToPlatform = true;
+    }
+
     /// <summary>MeteorManager 或其他脚本调用：陨石撞击发生</summary>
     public void OnMeteorImpact()
     {
         meteorImpactTriggered = true;
+    }
+
+    // ==================== 最近锚点查找 ====================
+
+    /// <summary>在所有锚点中找离 pos 最近的（返回 Component，调用方需 cast）</summary>
+    Component FindNearestAnchor(Vector3 pos)
+    {
+        Component best = null;
+        float bestDist = float.MaxValue;
+
+        foreach (var a in FindObjectsOfType<AnchorPoint>())
+        {
+            var cp = a.GetClosestSurfacePoint(pos);
+            float d = ((Vector2)pos - cp).sqrMagnitude;
+            if (d < bestDist) { bestDist = d; best = a; }
+        }
+        foreach (var a in FindObjectsOfType<PolyAnchorPoint>())
+        {
+            var cp = a.GetClosestSurfacePoint(pos);
+            float d = ((Vector2)pos - cp).sqrMagnitude;
+            if (d < bestDist) { bestDist = d; best = a; }
+        }
+
+        return best;
+    }
+
+    /// <summary>根据锚点类型分发到正确的 AttachToAnchor 重载</summary>
+    void AttachToNearest(PlayerController player, Component anchor)
+    {
+        if (anchor is AnchorPoint ap)
+            player.AttachToAnchor(ap, autoSnapSpeed);
+        else if (anchor is PolyAnchorPoint pap)
+            player.AttachToAnchor(pap, autoSnapSpeed);
     }
 }

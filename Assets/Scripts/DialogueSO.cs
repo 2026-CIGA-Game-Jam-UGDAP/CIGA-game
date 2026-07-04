@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Events;
 
 /// <summary>
-/// 单行对话数据
+/// 单行对话数据。portrait/bigPortrait 由 CreateAllDialogues 工具根据 CharacterConfig 自动填充。
 /// </summary>
 [System.Serializable]
 public struct DialogueLine
@@ -14,14 +14,11 @@ public struct DialogueLine
     [Tooltip("对话文本")]
     public string text;
 
-    [Tooltip("小头像 Sprite")]
+    [Tooltip("小头像 Sprite（自动填充自 CharacterConfig）")]
     public Sprite portrait;
 
-    [Tooltip("大立绘 Sprite（屏幕中央）")]
+    [Tooltip("大立绘 Sprite（屏幕中央，自动填充自 CharacterConfig）")]
     public Sprite bigPortrait;
-
-    [Tooltip("true=左侧站位, false=右侧站位（已废弃：现在按 speakerName 硬编码站位）")]
-    public bool isLeftSide;
 }
 
 /// <summary>

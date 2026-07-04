@@ -365,6 +365,10 @@ public class PlayerController : MonoBehaviour
             rb.MoveRotation(0f);
             rb.constraints |= RigidbodyConstraints2D.FreezeRotation;
         }
+
+        // ★ 通知 GameManager（关卡0 解除吸附触发链用）
+        var gm = GameManager.Instance;
+        if (gm != null) gm.OnPlayerDetached(playerIndex);
     }
 
     /// <summary>是否已被锚点吸附</summary>

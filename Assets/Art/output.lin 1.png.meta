@@ -118,7 +118,7 @@ TextureImporter:
         width: 1027
         height: 215
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       outline: []
       physicsShape: []
@@ -134,12 +134,12 @@ TextureImporter:
       name: output.lin 1_1
       rect:
         serializedVersion: 2
-        x: 147
-        y: 69
-        width: 1671
+        x: 149
+        y: 71
+        width: 1324
         height: 237
       alignment: 0
-      pivot: {x: 0, y: 0}
+      pivot: {x: 0.5, y: 0.5}
       border: {x: 0, y: 0, z: 0, w: 0}
       outline: []
       physicsShape: []

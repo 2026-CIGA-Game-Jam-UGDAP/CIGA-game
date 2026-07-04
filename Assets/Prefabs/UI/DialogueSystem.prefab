@@ -253,7 +253,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 4253872092126867010}
   serializedVersion: 2
-  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -273,6 +273,9 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 2ba2f2ea7d8d9cd48a052aec42e9c6c3, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  characterConfigs:
+  - {fileID: 11400000, guid: 17aa320274e3b534798c71c8edbc43a4, type: 2}
+  - {fileID: 11400000, guid: 22c777711d6391047a6e67fa8d4bfbb1, type: 2}
   dialoguePanel: {fileID: 6375116036932802047}
   bigPortrait: {fileID: 7134863438960022185}
   bigPortraitGo: {fileID: 698812877591191793}
@@ -421,7 +424,7 @@ Canvas:
   m_AdditionalShaderChannelsFlag: 25
   m_UpdateRectTransformForStandalone: 0
   m_SortingLayerID: 0
-  m_SortingOrder: 0
+  m_SortingOrder: 3
   m_TargetDisplay: 0
 --- !u!114 &5633490776153471251
 MonoBehaviour:
@@ -480,7 +483,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 1
+  m_IsActive: 0
 --- !u!224 &7622544502345860441
 RectTransform:
   m_ObjectHideFlags: 0

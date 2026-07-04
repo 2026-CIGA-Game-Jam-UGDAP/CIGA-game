@@ -16,13 +16,11 @@ MonoBehaviour:
   - speakerName: "\u62C9\u5179"
     text: "\u662F\u6211\u7684\u9519\u89C9\u5417\uFF0C\u6211\u600E\u4E48\u611F\u89C9\u521A\u521A\u6709\u4E2A\u4E1C\u897F\u4ECE\u90A3\u8FB9\u98DE\u8FC7\u6765\u4E86\uFF1F"
     portrait: {fileID: 0}
-    bigPortrait: {fileID: 0}
-    isLeftSide: 0
+    bigPortrait: {fileID: -391726316, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
   - speakerName: "\u65B9\u6CE2"
     text: "\u54EA\u91CC\uFF1F\u6211\u6CA1\u770B\u5230\u2014\u2014"
     portrait: {fileID: 0}
-    bigPortrait: {fileID: 0}
-    isLeftSide: 1
+    bigPortrait: {fileID: -1828046989, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
   useTypingEffect: 1
   useAnimation: 0
   needsCG: 0
