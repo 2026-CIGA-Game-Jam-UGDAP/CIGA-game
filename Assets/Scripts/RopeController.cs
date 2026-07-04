@@ -51,9 +51,17 @@ public class RopeController : MonoBehaviour
     float lastAppliedBendingStiffness = -1f;
     float lastAppliedTearResistance = -1f;
 
-    // 动态绳长：绷直时伸长，始终向 config.ropeLength 回归
+    // 可见绳长：始终向玩法约束长度回归，避免视觉绳松弛但实际约束已生效。
     float currentExtendedLength;
     float lastSyncedLength = -1f;
+
+    public float ConstraintLength => config != null
+        ? Mathf.Max(0.01f, config.ropeLength)
+        : Mathf.Max(0.01f, currentExtendedLength);
+
+    public bool HasConstraint => config != null;
+
+    public float Tension01 { get; private set; }
 
     bool ropeBroken;
     bool pinsSetup;
@@ -224,9 +232,8 @@ public class RopeController : MonoBehaviour
     }
 
     /// <summary>
-    /// 动态绳长 + 弹簧拉力。
-    /// 绷直时绳长即时伸长（+5% 余量），始终以 recoverySpeed 向 config.ropeLength 回归。
-    /// 弹簧始终用 config.ropeLength 做阈值，不因绳长变化而改变拉力判定。
+    /// 可见绳长 + 弹簧拉力。
+    /// 玩法约束始终使用 ConstraintLength；当玩家接近或超过约束时，Obi 可见绳也快速回到同一长度。
     /// </summary>
     void FixedUpdate()
     {
@@ -235,19 +242,25 @@ public class RopeController : MonoBehaviour
         Vector3 p1 = rb1.transform.position;
         Vector3 p2 = rb2.transform.position;
         float dist = Vector3.Distance(p1, p2);
+        float constraintLength = ConstraintLength;
 
-        // === 动态绳长：绷直伸长，始终向原始绳长回归 ===
-        if (dist > currentExtendedLength)
+        Tension01 = Mathf.InverseLerp(constraintLength * 0.85f, constraintLength, dist);
+
+        if (currentExtendedLength <= 0f)
+            currentExtendedLength = constraintLength;
+
+        if (Tension01 >= 1f)
         {
-            currentExtendedLength = dist * 1.05f;
+            currentExtendedLength = constraintLength;
         }
-
-        // 始终向原始绳长回归——绳子"想"回到默认长度
-        float recoverySpeed = 2f;
-        currentExtendedLength = Mathf.MoveTowards(
-            currentExtendedLength,
-            config.ropeLength,
-            recoverySpeed * Time.fixedDeltaTime);
+        else
+        {
+            float visualRecoverySpeed = Mathf.Lerp(2f, 18f, Tension01);
+            currentExtendedLength = Mathf.MoveTowards(
+                currentExtendedLength,
+                constraintLength,
+                visualRecoverySpeed * Time.fixedDeltaTime);
+        }
 
         // 推送变更到 Obi（阈值避免频繁增删粒子）
         if (cursor != null && Mathf.Abs(currentExtendedLength - lastSyncedLength) > 0.15f)
@@ -256,11 +269,11 @@ public class RopeController : MonoBehaviour
             cursor.ChangeLength(currentExtendedLength);
         }
 
-        // === 弹簧拉力（始终用 config.ropeLength 做阈值）===
-        if (dist > config.ropeLength)
+        // === 弹簧拉力（与可见绳共用同一约束长度）===
+        if (dist > constraintLength)
         {
             Vector3 dir = (p2 - p1).normalized;
-            float stretch = dist - config.ropeLength;
+            float stretch = dist - constraintLength;
             float force = stretch * config.stretchStiffness * 50f;
 
             rb1.AddForce(dir * force, ForceMode2D.Force);

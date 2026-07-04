@@ -131,6 +131,22 @@ public class PlayerController : MonoBehaviour
     {
         currentEnergy = maxEnergy;
 
+        if (ropeController == null)
+            ropeController = FindObjectOfType<RopeController>();
+
+        if (otherPlayer == null)
+        {
+            PlayerController[] players = FindObjectsOfType<PlayerController>();
+            for (int i = 0; i < players.Length; i++)
+            {
+                if (players[i] != this)
+                {
+                    otherPlayer = players[i];
+                    break;
+                }
+            }
+        }
+
         spawnBounce?.Play();
     }
 
@@ -226,9 +242,10 @@ public class PlayerController : MonoBehaviour
             // ★ 用锚点的方向符号：+1 表示 t 增加 = 右（顺时针），-1 表示需要反转
             float moveDir = rawHorizontal * AnchorMoveSign;
 
+            float nextSurfaceT = surfaceT;
             if (Mathf.Abs(moveDir) > 0.01f)
             {
-                surfaceT += moveDir * moveSpeed * Time.fixedDeltaTime;
+                nextSurfaceT += moveDir * moveSpeed * Time.fixedDeltaTime;
                 IsJetting = true;
             }
             else
@@ -236,6 +253,7 @@ public class PlayerController : MonoBehaviour
                 IsJetting = false;
             }
 
+            surfaceT = ClampSurfaceTByRope(nextSurfaceT);
             Vector2 targetPos = AnchorSurfacePoint(surfaceT);
 
             Vector2 normal = AnchorSurfaceNormal(surfaceT);
@@ -393,6 +411,73 @@ public class PlayerController : MonoBehaviour
     Vector2 AnchorSurfaceNormal(float t) => polyAnchoredAt != null ? polyAnchoredAt.GetSurfaceNormal(t) : anchoredAt.GetSurfaceNormal(t);
     float AnchorClosestT(Vector3 pos) => polyAnchoredAt != null ? polyAnchoredAt.FindClosestSurfaceT(pos) : anchoredAt.FindClosestSurfaceT(pos);
     Vector2 AnchorClosestPoint(Vector3 pos) => polyAnchoredAt != null ? polyAnchoredAt.GetClosestSurfacePoint(pos) : anchoredAt.GetClosestSurfacePoint(pos);
+
+    float ClampSurfaceTByRope(float candidateT)
+    {
+        if (ropeController == null || otherPlayer == null || !ropeController.HasConstraint)
+            return candidateT;
+
+        float limit = ropeController.ConstraintLength;
+        if (limit <= 0.0001f || float.IsNaN(limit) || float.IsInfinity(limit))
+            return candidateT;
+
+        Vector2 candidatePos = AnchorSurfacePoint(candidateT);
+        Vector2 otherPos = otherPlayer.GetRopeConstraintPosition();
+        if (!IsFinite(candidatePos) || !IsFinite(otherPos))
+            return candidateT;
+
+        float limitSq = limit * limit;
+        Vector2 candidateDelta = candidatePos - otherPos;
+        if (candidateDelta.sqrMagnitude <= limitSq)
+            return candidateT;
+
+        if (candidateDelta.sqrMagnitude > 0.0001f)
+        {
+            Vector2 projected = otherPos + candidateDelta.normalized * limit;
+            float projectedT = AnchorClosestT(projected);
+            if (!float.IsNaN(projectedT) && !float.IsInfinity(projectedT))
+            {
+                Vector2 projectedPos = AnchorSurfacePoint(projectedT);
+                float paddedLimit = limit + 0.02f;
+                if (IsFinite(projectedPos) && (projectedPos - otherPos).sqrMagnitude <= paddedLimit * paddedLimit)
+                    return projectedT;
+            }
+        }
+
+        return FindLastRopeSafeSurfaceT(surfaceT, candidateT, otherPos, limit);
+    }
+
+    float FindLastRopeSafeSurfaceT(float startT, float blockedT, Vector2 otherPos, float limit)
+    {
+        float safeT = startT;
+        float unsafeT = blockedT;
+        float limitSq = limit * limit;
+
+        for (int i = 0; i < 12; i++)
+        {
+            float midT = (safeT + unsafeT) * 0.5f;
+            Vector2 midPos = AnchorSurfacePoint(midT);
+            bool midSafe = IsFinite(midPos) && (midPos - otherPos).sqrMagnitude <= limitSq;
+
+            if (midSafe)
+                safeT = midT;
+            else
+                unsafeT = midT;
+        }
+
+        return safeT;
+    }
+
+    Vector2 GetRopeConstraintPosition()
+    {
+        return rb != null ? rb.position : (Vector2)transform.position;
+    }
+
+    static bool IsFinite(Vector2 value)
+    {
+        return !float.IsNaN(value.x) && !float.IsNaN(value.y)
+            && !float.IsInfinity(value.x) && !float.IsInfinity(value.y);
+    }
 
     /// <summary>沿表面推开一段距离（碰碰车弹开用）</summary>
     public void BumpOnSurface(float deltaT)
