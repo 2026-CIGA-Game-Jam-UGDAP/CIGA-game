@@ -220,7 +220,8 @@ public class RopeController : MonoBehaviour
 
     /// <summary>
     /// 可见绳长 + 弹簧拉力。
-    /// 玩法约束始终使用 ConstraintLength；当玩家接近或超过约束时，Obi 可见绳也快速回到同一长度。
+    /// ★ 可见绳长必须 ≥ 实际距离（+5% 余量），否则 Obi pin 约束和 distance 约束打架，绳结被扯歪。
+    /// ★ 弹簧拉力用 constraintLength 做阈值，与可见绳长分离。
     /// </summary>
     void FixedUpdate()
     {
@@ -236,16 +237,19 @@ public class RopeController : MonoBehaviour
         if (currentExtendedLength <= 0f)
             currentExtendedLength = constraintLength;
 
-        if (Tension01 >= 1f)
+        // === 可见绳长：始终覆盖实际距离，禁止短于间距（防止约束打架） ===
+        float minVisualLength = dist * 1.05f;
+        if (currentExtendedLength < minVisualLength)
         {
-            currentExtendedLength = constraintLength;
+            currentExtendedLength = minVisualLength;
         }
-        else
+        else if (dist <= constraintLength)
         {
             float visualRecoverySpeed = Mathf.Lerp(2f, 18f, Tension01);
+            float target = Mathf.Max(constraintLength, minVisualLength);
             currentExtendedLength = Mathf.MoveTowards(
                 currentExtendedLength,
-                constraintLength,
+                target,
                 visualRecoverySpeed * Time.fixedDeltaTime);
         }
 
