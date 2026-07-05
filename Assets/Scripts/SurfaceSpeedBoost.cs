@@ -11,6 +11,8 @@ public class SurfaceSpeedBoost : MonoBehaviour
     [Header("加速量")]
     [Tooltip("拾取后给玩家 moveSpeed 加的值")]
     public float speedBonus = 3f;
+    [Tooltip("加速后 moveSpeed 的最高上限")]
+    public float maxSpeedCap = 6f;
 
     [Header("浮字提示")]
     [Tooltip("飘字初始颜色")]
@@ -27,7 +29,7 @@ public class SurfaceSpeedBoost : MonoBehaviour
         var pc = other.GetComponent<PlayerController>();
         if (pc == null) return;
 
-        pc.moveSpeed += speedBonus;
+        pc.moveSpeed = Mathf.Min(pc.moveSpeed + speedBonus, maxSpeedCap);
 
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlayEnergyPickup();
