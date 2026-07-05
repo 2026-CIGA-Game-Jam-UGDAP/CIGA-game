@@ -152,6 +152,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   bgmClip: {fileID: 8300000, guid: a7be042749f1e3c419f778187087e32a, type: 3}
+  volume: 1.5
 --- !u!4 &242338480
 Transform:
   m_ObjectHideFlags: 0
@@ -389,7 +390,7 @@ MonoBehaviour:
   dockTrigger2: {fileID: 0}
   shipAnimTrigger: Play
   shipAnimDuration: 2
-  nextSceneName: Level3
+  nextSceneName: Lobby
   pauseMenu: {fileID: 0}
   enterDialogue: {fileID: 11400000, guid: 065186e44dfc7694bac2fbc542dcf5f9, type: 2}
   afterDetachDialogue: {fileID: 0}
@@ -397,6 +398,7 @@ MonoBehaviour:
   afterDetach2Dialogue: {fileID: 0}
   afterJetpackDialogue: {fileID: 0}
   afterExitDialogue: {fileID: 0}
+  approachDockDialogue: {fileID: 0}
   afterRechargeDialogue: {fileID: 0}
   afterRechargeGoToShipDialogue: {fileID: 0}
   afterReachShipDialogue: {fileID: 0}

@@ -22,7 +22,8 @@ public class LobbyManager : MonoBehaviour
         if (fadeImage != null)
         {
             fadeImage.color = Color.black;
-            fadeImage.DOFade(0f, fadeDuration);
+            fadeImage.DOFade(0f, fadeDuration)
+                .OnComplete(() => fadeImage.raycastTarget = false);
         }
     }
 
@@ -30,6 +31,7 @@ public class LobbyManager : MonoBehaviour
     {
         if (fadeImage != null)
         {
+            fadeImage.raycastTarget = true;
             fadeImage.DOFade(1f, fadeDuration)
                 .OnComplete(() => SceneLoader.Go(GameScene.Level0));
         }

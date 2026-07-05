@@ -8,10 +8,12 @@ public class SceneBGM : MonoBehaviour
 {
     [Tooltip("本场景的背景音乐")]
     public AudioClip bgmClip;
+    [Tooltip("本场景 BGM 音量（0~2，默认 1）")]
+    [Range(0f, 2f)] public float volume = 1f;
 
     void Start()
     {
         if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayBGM(bgmClip);
+            AudioManager.Instance.PlayBGM(bgmClip, volume);
     }
 }

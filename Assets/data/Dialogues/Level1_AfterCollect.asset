@@ -21,15 +21,11 @@ MonoBehaviour:
     text: "\u6211\u770B\u770B\u2026\u2026\u5BF9\uFF0C\u6E05\u5355\u4E0A\u663E\u793A\u5DF2\u7ECF\u5B8C\u6210\u4E86\u3002"
     portrait: {fileID: 0}
     bigPortrait: {fileID: -391726316, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
-  - speakerName: "\u62C9\u5179"
-    text: "\u7EE7\u7EED\u52A0\u6CB9\uFF0C\u56DE\u5230\u8239\u4E0A\u53BB\u5427\uFF0C\u8981\u53BB\u4E0B\u4E00\u7247\u5C0F\u884C\u661F\u7FA4\u4E86\u3002"
-    portrait: {fileID: 0}
-    bigPortrait: {fileID: -391726316, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
   - speakerName: 
     text: "\u6BCF\u6B21\u6536\u96C6\u7ED3\u675F\u540E\u9700\u8981\u56DE\u5230\u98DE\u8239\u4E0A\uFF01"
     portrait: {fileID: 0}
     bigPortrait: {fileID: 0}
-  useTypingEffect: 1
+  useTypingEffect: 0
   useAnimation: 0
   needsCG: 0
   onComplete:

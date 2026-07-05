@@ -33,6 +33,9 @@ public class AudioManager : MonoBehaviour
     [Tooltip("3D one-shot 音源数量（脚步、吸附等并发上限）")]
     public int poolSize = 6;
 
+    [Header("音量")]
+    [Range(0f, 2f)] public float bgmVolume = 1.5f;
+
     // ---- 内部 ----
     AudioSource uiSource;
     AudioSource bgmSource;
@@ -64,6 +67,7 @@ public class AudioManager : MonoBehaviour
         bgmSource.spatialBlend = 0f;
         bgmSource.loop = true;
         bgmSource.playOnAwake = false;
+        bgmSource.volume = bgmVolume;
 
         // 2D 音源（对话）：挂在自身，不叠加、可打断，非循环
         dialogueSource = gameObject.AddComponent<AudioSource>();
@@ -179,8 +183,8 @@ public class AudioManager : MonoBehaviour
 
     // ==================== BGM ====================
 
-    /// <summary>播放/切换背景音乐。传 null 则停止。</summary>
-    public void PlayBGM(AudioClip clip)
+    /// <summary>播放/切换背景音乐。传 null 则停止。volume 覆盖全局默认值。</summary>
+    public void PlayBGM(AudioClip clip, float volume = -1f)
     {
         if (clip == null)
         {
@@ -192,6 +196,7 @@ public class AudioManager : MonoBehaviour
         if (bgmSource.clip == clip && bgmSource.isPlaying) return;
 
         bgmSource.clip = clip;
+        bgmSource.volume = volume > 0f ? volume : bgmVolume;
         bgmSource.Play();
     }
 

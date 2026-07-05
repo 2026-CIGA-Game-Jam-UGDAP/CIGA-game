@@ -46,7 +46,7 @@ public class SurfaceSpeedBoost : MonoBehaviour
         popup.transform.position = playerTransform.position + Vector3.up * 2f;
 
         TextMeshPro tmp = popup.AddComponent<TextMeshPro>();
-        tmp.text = "移动速度UP!";
+        tmp.text = "Speed ++！";
         tmp.fontSize = popupFontSize;
         tmp.color = popupColor;
         tmp.alignment = TextAlignmentOptions.Center;

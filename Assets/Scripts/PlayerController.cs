@@ -339,19 +339,38 @@ public class PlayerController : MonoBehaviour
     public void AttachToAnchor(AnchorPoint anchor, float speed)
     {
         if (!isAnchored && !isFlyingToAnchor)
+        {
+            Debug.Log($"[PlayerController] Player{playerIndex} AttachToAnchor(AnchorPoint): anchor={anchor.name}, speed={speed}");
             StartCoroutine(AttachRoutine(anchor, speed));
+        }
+        else
+        {
+            Debug.Log($"[PlayerController] Player{playerIndex} AttachToAnchor(AnchorPoint) 跳过: IsAnchored={isAnchored}, IsFlying={isFlyingToAnchor}");
+        }
     }
 
     /// <summary>锚点调用：平滑飞到多边形表面最近点，之后在表面切向移动</summary>
     public void AttachToAnchor(PolyAnchorPoint anchor, float speed)
     {
         if (!isAnchored && !isFlyingToAnchor)
+        {
+            Debug.Log($"[PlayerController] Player{playerIndex} AttachToAnchor(PolyAnchorPoint): anchor={anchor.name}, speed={speed}");
             StartCoroutine(AttachRoutine(anchor, speed));
+        }
+        else
+        {
+            Debug.Log($"[PlayerController] Player{playerIndex} AttachToAnchor(PolyAnchorPoint) 跳过: IsAnchored={isAnchored}, IsFlying={isFlyingToAnchor}");
+        }
     }
 
     /// <summary>锚点调用：解除吸附，恢复自由移动</summary>
     public void DetachFromAnchor()
     {
+        string anchorName = "null";
+        if ((Component)anchoredAt != null) anchorName = ((Component)anchoredAt).name;
+        else if ((Component)polyAnchoredAt != null) anchorName = ((Component)polyAnchoredAt).name;
+        Debug.Log($"[PlayerController] Player{playerIndex} DetachFromAnchor: IsAnchored={isAnchored}, anchor={anchorName}");
+
         // ★ 恢复碰撞
         Component anchorComp = (Component)anchoredAt ?? polyAnchoredAt;
         if (anchorComp != null)
@@ -379,6 +398,8 @@ public class PlayerController : MonoBehaviour
 
     /// <summary>是否已被锚点吸附</summary>
     public bool IsAnchored => isAnchored;
+    /// <summary>是否正在飞向锚点（飞行中）</summary>
+    public bool IsFlyingToAnchor => isFlyingToAnchor;
     /// <summary>当前吸附的锚点（用于碰碰车判断是否同锚点，返回 object 做引用比较）</summary>
     public object CurrentAnchor => (object)anchoredAt ?? polyAnchoredAt;
     /// <summary>当前在表面上的位置 t 值</summary>
@@ -485,6 +506,8 @@ public class PlayerController : MonoBehaviour
         isFlyingToAnchor = false;
         isAnchored = true;
 
+        Debug.Log($"[PlayerController] Player{playerIndex} 吸附完成(AnchorPoint): anchor={anchor.name}, surfaceT={surfaceT}");
+
         // ★ 忽略碰撞
         IgnoreSurfaceCollision(anchor, true);
 
@@ -564,6 +587,8 @@ public class PlayerController : MonoBehaviour
 
         isFlyingToAnchor = false;
         isAnchored = true;
+
+        Debug.Log($"[PlayerController] Player{playerIndex} 吸附完成(PolyAnchorPoint): anchor={anchor.name}, surfaceT={surfaceT}");
 
         // ★ 忽略玩家与表面非 trigger collider 的物理碰撞，防止物理引擎推歪/推倒玩家
         IgnoreSurfaceCollision(anchor, true);

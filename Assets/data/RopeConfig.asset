@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ade0593a8b07e6b43b117a4d5b5fde47, type: 3}
   m_Name: RopeConfig
   m_EditorClassIdentifier: 
-  ropeLength: 5
+  ropeLength: 4.5
   thickness: 0.07
   stretchStiffness: 0.871
   bendingStiffness: 0.823

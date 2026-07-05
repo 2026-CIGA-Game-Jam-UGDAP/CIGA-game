@@ -404,13 +404,18 @@ public class PolyAnchorPoint : MonoBehaviour
         if (pc != null && !playersInRange.Contains(pc))
         {
             playersInRange.Add(pc);
+            Debug.Log($"[PolyAnchorPoint] {name}: Player{pc.playerIndex} 进入触发区 (当前范围人数={playersInRange.Count})");
         }
     }
 
     void OnTriggerExit2D(Collider2D other)
     {
         var pc = other.GetComponentInParent<PlayerController>();
-        if (pc != null) playersInRange.Remove(pc);
+        if (pc != null)
+        {
+            playersInRange.Remove(pc);
+            Debug.Log($"[PolyAnchorPoint] {name}: Player{pc.playerIndex} 离开触发区 (当前范围人数={playersInRange.Count}, 已吸附={pc.IsAnchored})");
+        }
     }
 
     void Update()
@@ -418,32 +423,53 @@ public class PolyAnchorPoint : MonoBehaviour
         for (int i = playersInRange.Count - 1; i >= 0; i--)
             if (playersInRange[i] == null) playersInRange.RemoveAt(i);
 
+        // ★ 只有真正脱离（非吸附且非飞行中）才清理。飞行中的玩家暂时 isAnchored=false，不能踢
         for (int i = anchoredPlayers.Count - 1; i >= 0; i--)
-            if (anchoredPlayers[i] == null || !anchoredPlayers[i].IsAnchored)
+            if (anchoredPlayers[i] == null || (!anchoredPlayers[i].IsAnchored && !anchoredPlayers[i].IsFlyingToAnchor))
                 anchoredPlayers.RemoveAt(i);
+
+        var checkedPlayers = new System.Collections.Generic.HashSet<PlayerController>();
 
         for (int i = 0; i < playersInRange.Count; i++)
         {
             var pc = playersInRange[i];
             if (pc == null) continue;
+            checkedPlayers.Add(pc);
 
             KeyCode key = pc.playerIndex == 0 ? PlayerController.P1_Snap : PlayerController.P2_Snap;
             if (!Input.GetKeyDown(key)) continue;
 
             if (pc.IsAnchored)
             {
+                Debug.Log($"[PolyAnchorPoint] {name}: Player{pc.playerIndex} 按键脱离 (当前锚点={pc.CurrentAnchor}, IsAnchored={pc.IsAnchored}, IsFlying={pc.IsFlyingToAnchor})");
                 pc.DetachFromAnchor();
                 anchoredPlayers.Remove(pc);
             }
             else
             {
+                Debug.Log($"[PolyAnchorPoint] {name}: Player{pc.playerIndex} 按键吸附 (IsAnchored={pc.IsAnchored}, IsFlying={pc.IsFlyingToAnchor})");
                 pc.AttachToAnchor(this, snapSpeed);
                 anchoredPlayers.Add(pc);
             }
-
-            if (indicator != null)
-                indicator.color = anchoredPlayers.Count > 0 ? occupiedColor : freeColor;
         }
+
+        // ★ 已吸附玩家即使离开触发区也能脱离
+        for (int i = anchoredPlayers.Count - 1; i >= 0; i--)
+        {
+            var pc = anchoredPlayers[i];
+            if (pc == null) continue;
+            if (checkedPlayers.Contains(pc)) continue;
+
+            KeyCode key = pc.playerIndex == 0 ? PlayerController.P1_Snap : PlayerController.P2_Snap;
+            if (!Input.GetKeyDown(key)) continue;
+
+            Debug.Log($"[PolyAnchorPoint] {name}: Player{pc.playerIndex} 按键脱离(anchoredPlayers, 已离开触发区) (IsAnchored={pc.IsAnchored})");
+            pc.DetachFromAnchor();
+            anchoredPlayers.RemoveAt(i);
+        }
+
+        if (indicator != null)
+            indicator.color = anchoredPlayers.Count > 0 ? occupiedColor : freeColor;
     }
 
     // ============ Gizmos ============

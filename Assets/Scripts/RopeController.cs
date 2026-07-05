@@ -37,6 +37,10 @@ public class RopeController : MonoBehaviour
     [Tooltip("GameManager 引用，断裂时回调 OnRopeBreak()")]
     public GameManager gameManager;
 
+    [Header("端点同步")]
+    [Tooltip("端点每帧最大同步速度，防止击飞时绳子瞬间拉长变形")]
+    public float maxEndpointSnapSpeed = 30f;
+
     [Header("传输特效")]
     [Tooltip("绳子渲染器（拖入 MeshRenderer 或 Obi 渲染器组件）")]
     public Renderer ropeRenderer;
@@ -61,6 +65,8 @@ public class RopeController : MonoBehaviour
 
     Rigidbody2D rb1;
     Rigidbody2D rb2;
+    PlayerController pc1;
+    PlayerController pc2;
 
     void Awake()
     {
@@ -99,6 +105,8 @@ public class RopeController : MonoBehaviour
         // ★ 缓存 Rigidbody2D（必须在 SetupPins 之前，用于冻结玩家）
         rb1 = player1Collider != null ? player1Collider.GetComponent<Rigidbody2D>() : null;
         rb2 = player2Collider != null ? player2Collider.GetComponent<Rigidbody2D>() : null;
+        pc1 = rb1 != null ? rb1.GetComponent<PlayerController>() : null;
+        pc2 = rb2 != null ? rb2.GetComponent<PlayerController>() : null;
 
         // ★ 冻结玩家 → Obi pin 约束无法移动 kinematic 物体 → 绳子自己在两人之间就位
         if (rb1 != null) rb1.isKinematic = true;
@@ -217,6 +225,9 @@ public class RopeController : MonoBehaviour
     /// <summary>
     /// 弹簧拉力：玩家间距超过基准绳长时双向拉回。
     /// 绳子不主动调 cursor 伸长——Obi pin 约束 + 距离约束自然拉伸。
+    ///
+    /// ★ 击飞恢复：绳子严重超伸（>1.5x 绳长）时临时提高求解器迭代次数，
+    /// 帮助中间粒子快速追上端点位移，恢复自然绳形。
     /// </summary>
     void FixedUpdate()
     {
@@ -225,6 +236,25 @@ public class RopeController : MonoBehaviour
         Vector3 p1 = rb1.transform.position;
         Vector3 p2 = rb2.transform.position;
         float dist = Vector3.Distance(p1, p2);
+
+        // ★ 击飞恢复：严重超伸时临时提升距离约束迭代
+        if (solver != null && config.ropeLength > 0f)
+        {
+            float stretchRatio = dist / config.ropeLength;
+            if (stretchRatio > 1.5f)
+            {
+                // 紧急迭代：正常 3~10 次 → 击飞时 20~50 次
+                int emergencyIters = Mathf.RoundToInt(Mathf.Min(stretchRatio * 10f, 50f));
+                solver.distanceConstraintParameters.iterations = emergencyIters;
+            }
+            else
+            {
+                // 恢复正常迭代数
+                int normalIters = Mathf.RoundToInt(config.stretchStiffness * 10f);
+                if (solver.distanceConstraintParameters.iterations != Mathf.Max(1, normalIters))
+                    solver.distanceConstraintParameters.iterations = Mathf.Max(1, normalIters);
+            }
+        }
 
         if (dist > config.ropeLength)
         {
@@ -243,6 +273,13 @@ public class RopeController : MonoBehaviour
     /// 表面行走用 rb.MovePosition（瞬移），Obi solver 在 FixedUpdate 求解后，
     /// 相邻粒子需要多个迭代才能追上瞬移量 → 绳端产生甩动/拉长闪烁。
     /// 这里在渲染前直接矫正端粒子位置，绕过 solver 延迟。
+    ///
+    /// ★ 击飞保护：非吸附时端点每帧移动距离上限 = maxEndpointSnapSpeed * dt。
+    /// 陨石击飞时玩家瞬间位移巨大，若端点无限制 snap 会导致绳子拉长变形。
+    /// 限制 snap 速度后，求解器有足够时间把位移传播到中间粒子。
+    ///
+    /// ★ 吸附时强制同步：表面移动是 MovePosition 瞬移，若端点也被限速会跟不上，
+    /// 绳子拖拽玩家导致卡住。吸附状态下直接设为目标位置，不做限速。
     /// </summary>
     void LateUpdate()
     {
@@ -250,12 +287,19 @@ public class RopeController : MonoBehaviour
 
         var pos = rope.positions;
         var vel = rope.velocities;
+        float maxDelta = maxEndpointSnapSpeed * Time.deltaTime;
 
         // 粒子 0 → Player1（用 rb.position 避免 Rigidbody2D Interpolate 导致的插值偏差）
         if (player1Collider != null && rb1 != null && pos.Length > 0)
         {
-            Vector3 target = (Vector3)rb1.position + pinOffset;
-            pos[0] = rope.transform.InverseTransformPoint(target);
+            Vector3 targetWorld = (Vector3)rb1.position + pinOffset;
+            Vector3 currentWorld = rope.transform.TransformPoint(pos[0]);
+            // ★ 吸附状态：强制同步不下滑，不走限速；非吸附：限速防击飞拉长
+            bool anchored = pc1 != null && pc1.IsAnchored;
+            Vector3 clampedWorld = anchored
+                ? targetWorld
+                : Vector3.MoveTowards(currentWorld, targetWorld, maxDelta);
+            pos[0] = rope.transform.InverseTransformPoint(clampedWorld);
             if (vel.Length > 0) vel[0] = Vector3.zero;
         }
 
@@ -265,8 +309,14 @@ public class RopeController : MonoBehaviour
             int idx = rope.UsedParticles - 1;
             if (idx < pos.Length)
             {
-                Vector3 target = (Vector3)rb2.position + pinOffset;
-                pos[idx] = rope.transform.InverseTransformPoint(target);
+                Vector3 targetWorld = (Vector3)rb2.position + pinOffset;
+                Vector3 currentWorld = rope.transform.TransformPoint(pos[idx]);
+                // ★ 吸附状态：强制同步不下滑，不走限速
+                bool anchored = pc2 != null && pc2.IsAnchored;
+                Vector3 clampedWorld = anchored
+                    ? targetWorld
+                    : Vector3.MoveTowards(currentWorld, targetWorld, maxDelta);
+                pos[idx] = rope.transform.InverseTransformPoint(clampedWorld);
                 if (vel.Length > idx) vel[idx] = Vector3.zero;
             }
         }

@@ -105,6 +105,7 @@ public class GameManager : MonoBehaviour
 
     bool resetting;
     bool shipAnimating;
+    bool hasWon;
 
     // 对话调度状态
     bool enterDialogueReady;
@@ -176,7 +177,10 @@ public class GameManager : MonoBehaviour
         IsInitializing = false;
 
         if (fadeImage != null)
+        {
             yield return fadeImage.DOFade(0f, fadeDuration).WaitForCompletion();
+            fadeImage.raycastTarget = false;
+        }
 
         // ★ 自动吸附到最近的锚点（不再只吸飞船）
         if (autoSnapToShip)
@@ -259,7 +263,7 @@ public class GameManager : MonoBehaviour
 
     public void ResetLevel()
     {
-        if (resetting) return;
+        if (hasWon || resetting) return;
         resetting = true;
         StartCoroutine(ResetLevelAsync());
     }
@@ -268,7 +272,10 @@ public class GameManager : MonoBehaviour
     {
         // 1. 黑屏淡入
         if (fadeImage != null)
+        {
+            fadeImage.raycastTarget = true;
             yield return fadeImage.DOFade(1f, fadeDuration).WaitForCompletion();
+        }
 
         // 2. 完全重载场景：销毁所有对象，Obi + 物理从零初始化
         //    Start() → InitSequence() 会自然处理黑屏→绳子就位→淡出
@@ -352,6 +359,8 @@ public class GameManager : MonoBehaviour
 
     void Victory()
     {
+        hasWon = true;
+
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlaySceneTransition();
 
