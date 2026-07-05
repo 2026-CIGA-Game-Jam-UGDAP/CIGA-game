@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections;
 using Obi;
+using DG.Tweening;
 
 /// <summary>
 /// Obi 绳索管理器：运行时初始化 + Pin 约束 + 实时调参 + 断裂检测。
@@ -36,27 +37,31 @@ public class RopeController : MonoBehaviour
     [Tooltip("GameManager 引用，断裂时回调 OnRopeBreak()")]
     public GameManager gameManager;
 
+    [Header("传输特效")]
+    [Tooltip("绳子渲染器（拖入 MeshRenderer 或 Obi 渲染器组件）")]
+    public Renderer ropeRenderer;
+    [Tooltip("传输时绳子的目标颜色")]
+    public Color transferColor = new Color(1f, 0.8f, 0.2f, 1f);
+    [Tooltip("传输颜色动画时长")]
+    public float transferColorDuration = 0.3f;
+
     // 调参脏标记：避免每帧 ChangeLength（增删粒子是重操作）
     float lastAppliedLength = -1f;
     float lastAppliedStretchStiffness = -1f;
     float lastAppliedBendingStiffness = -1f;
     float lastAppliedTearResistance = -1f;
 
-    // 可见绳长：始终向玩法约束长度回归，避免视觉绳松弛但实际约束已生效。
+    // 动态绳长：绷直时伸长，始终向 config.ropeLength 回归
     float currentExtendedLength;
     float lastSyncedLength = -1f;
-
-    public float ConstraintLength => config != null
-        ? Mathf.Max(0.01f, config.ropeLength)
-        : Mathf.Max(0.01f, currentExtendedLength);
-
-    public bool HasConstraint => config != null;
-
-    public float Tension01 { get; private set; }
 
     bool ropeBroken;
     bool pinsSetup;
     int lastUsedParticles;
+    bool isTransferEffectActive;
+    Color originalRopeColor;
+    Material ropeMaterialInstance;
+    Tweener transferTweener;
 
     Rigidbody2D rb1;
     Rigidbody2D rb2;
@@ -219,9 +224,9 @@ public class RopeController : MonoBehaviour
     }
 
     /// <summary>
-    /// 可见绳长 + 弹簧拉力。
-    /// ★ 可见绳长必须 ≥ 实际距离（+5% 余量），否则 Obi pin 约束和 distance 约束打架，绳结被扯歪。
-    /// ★ 弹簧拉力用 constraintLength 做阈值，与可见绳长分离。
+    /// 动态绳长 + 弹簧拉力。
+    /// 绷直时绳长即时伸长（+5% 余量），始终以 recoverySpeed 向 config.ropeLength 回归。
+    /// 弹簧始终用 config.ropeLength 做阈值，不因绳长变化而改变拉力判定。
     /// </summary>
     void FixedUpdate()
     {
@@ -230,28 +235,19 @@ public class RopeController : MonoBehaviour
         Vector3 p1 = rb1.transform.position;
         Vector3 p2 = rb2.transform.position;
         float dist = Vector3.Distance(p1, p2);
-        float constraintLength = ConstraintLength;
 
-        Tension01 = Mathf.InverseLerp(constraintLength * 0.85f, constraintLength, dist);
-
-        if (currentExtendedLength <= 0f)
-            currentExtendedLength = constraintLength;
-
-        // === 可见绳长：始终覆盖实际距离，禁止短于间距（防止约束打架） ===
-        float minVisualLength = dist * 1.05f;
-        if (currentExtendedLength < minVisualLength)
+        // === 动态绳长：绷直伸长，始终向原始绳长回归 ===
+        if (dist > currentExtendedLength)
         {
-            currentExtendedLength = minVisualLength;
+            currentExtendedLength = dist * 1.05f;
         }
-        else if (dist <= constraintLength)
-        {
-            float visualRecoverySpeed = Mathf.Lerp(2f, 18f, Tension01);
-            float target = Mathf.Max(constraintLength, minVisualLength);
-            currentExtendedLength = Mathf.MoveTowards(
-                currentExtendedLength,
-                target,
-                visualRecoverySpeed * Time.fixedDeltaTime);
-        }
+
+        // 始终向原始绳长回归——绳子"想"回到默认长度
+        float recoverySpeed = 2f;
+        currentExtendedLength = Mathf.MoveTowards(
+            currentExtendedLength,
+            config.ropeLength,
+            recoverySpeed * Time.fixedDeltaTime);
 
         // 推送变更到 Obi（阈值避免频繁增删粒子）
         if (cursor != null && Mathf.Abs(currentExtendedLength - lastSyncedLength) > 0.15f)
@@ -260,11 +256,11 @@ public class RopeController : MonoBehaviour
             cursor.ChangeLength(currentExtendedLength);
         }
 
-        // === 弹簧拉力（与可见绳共用同一约束长度）===
-        if (dist > constraintLength)
+        // === 弹簧拉力（始终用 config.ropeLength 做阈值）===
+        if (dist > config.ropeLength)
         {
             Vector3 dir = (p2 - p1).normalized;
-            float stretch = dist - constraintLength;
+            float stretch = dist - config.ropeLength;
             float force = stretch * config.stretchStiffness * 50f;
 
             rb1.AddForce(dir * force, ForceMode2D.Force);
@@ -373,4 +369,36 @@ public class RopeController : MonoBehaviour
         lastSyncedLength = -1f;
     }
 
+    /// <summary>传输能量时绳子变色特效。PlayerController 按住/松开传输键时调用。</summary>
+    public void SetTransferEffect(bool active)
+    {
+        // 懒加载：首次取绳子材质实例
+        if (ropeMaterialInstance == null)
+        {
+            // 优先用手动拖入的 renderer，否则自动找
+            if (ropeRenderer == null)
+                ropeRenderer = GetComponent<Renderer>();
+            if (ropeRenderer == null) return;
+
+            ropeMaterialInstance = ropeRenderer.material;
+            originalRopeColor = ropeMaterialInstance.color;
+        }
+
+        if (active && !isTransferEffectActive)
+        {
+            isTransferEffectActive = true;
+            transferTweener?.Kill();
+            transferTweener = ropeMaterialInstance
+                .DOColor(transferColor, transferColorDuration)
+                .SetEase(Ease.OutQuad);
+        }
+        else if (!active && isTransferEffectActive)
+        {
+            isTransferEffectActive = false;
+            transferTweener?.Kill();
+            transferTweener = ropeMaterialInstance
+                .DOColor(originalRopeColor, transferColorDuration)
+                .SetEase(Ease.OutQuad);
+        }
+    }
 }

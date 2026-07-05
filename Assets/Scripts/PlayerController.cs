@@ -1,4 +1,5 @@
 using UnityEngine;
+using DG.Tweening;
 
 /// <summary>
 /// 太空惯性移动 —— 无重力漂浮 + 喷气背包。
@@ -14,12 +15,14 @@ public class PlayerController : MonoBehaviour
     public const KeyCode P1_JetUp      = KeyCode.W;
     public const KeyCode P1_JetLeft    = KeyCode.A;
     public const KeyCode P1_JetRight   = KeyCode.D;
+    public const KeyCode P1_Transfer   = KeyCode.F;
     public const KeyCode P1_Snap       = KeyCode.LeftShift;
 
     // P2
     public const KeyCode P2_JetUp      = KeyCode.UpArrow;
     public const KeyCode P2_JetLeft    = KeyCode.LeftArrow;
     public const KeyCode P2_JetRight   = KeyCode.RightArrow;
+    public const KeyCode P2_Transfer   = KeyCode.Keypad0;
     public const KeyCode P2_Snap       = KeyCode.Return;
 
     // 通用
@@ -40,14 +43,16 @@ public class PlayerController : MonoBehaviour
     public float moveSpeed = 3f;
     [Tooltip("惯性阻尼。越小越滑（太空漂浮感），0.05=明显漂浮，1=立刻停下")]
     public float linearDrag = 0.05f;
-    [Tooltip("吸附后转身角速度（度/秒），值越小转身越平滑。高速绕小星球需要较高值才能跟上表面法线变化")]
-    public float turnSpeed = 720f;
+    [Tooltip("吸附后转身角速度（度/秒），值越小转身越平滑")]
+    public float turnSpeed = 180f;
 
     [Header("能量")]
     [Tooltip("能量段数上限")]
     [SerializeField] float maxEnergy = 6f;
     [Tooltip("持续喷气时每秒消耗的能量")]
     [SerializeField] float jetEnergyDrainRate = 2f;
+    [Tooltip("最大可传输段数（单次按住上限）")]
+    [SerializeField] float maxTransferSegments = 3f;
     float currentEnergy;
 
     // ★ 持续喷气：FixedUpdate 中直接用 GetKey 读取，每物理帧施加连续推力
@@ -65,8 +70,13 @@ public class PlayerController : MonoBehaviour
     [Header("队友交互")]
     [Tooltip("拖入另一个玩家的 PlayerController 引用")]
     public PlayerController otherPlayer;
-    [Tooltip("绳索控制器引用")]
+    [Tooltip("按住传输键时每秒传给队友的能量")]
+    [SerializeField] float transferRate = 3f;
+    [Tooltip("绳索控制器引用（传输时改变绳子颜色）")]
     [SerializeField] RopeController ropeController;
+
+    /// <summary>当前这次按住已传输的段数（松手清零）</summary>
+    float transferredThisHold;
 
     [Header("音效")]
     [Tooltip("推进器 AudioSource（挂在 Player 上，用于循环喷射音效）")]
@@ -97,8 +107,6 @@ public class PlayerController : MonoBehaviour
     float surfaceT;           // 玩家在表面上的当前距离（沿周长，圆和多边形统一）
     float smoothedAngle;      // 平滑后的当前旋转角度（度），用于 LerpAngle
     bool wasJetting;          // 上一帧是否喷气，用于检测推进器音效 Start/Stop
-    bool jetpackNotified;     // 是否已通知 GameManager 喷气
-    GameManager gm;           // 缓存引用
 
     // ---- 生命周期 ----
 
@@ -113,7 +121,7 @@ public class PlayerController : MonoBehaviour
             rb.gravityScale = 0f;
             rb.drag = linearDrag;
             // ★ 关插值：否则吸附 MovePosition 时 transform.position（Sprite 用）≠ rb.position（绳子用）
-            rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            rb.interpolation = RigidbodyInterpolation2D.None;
             // ★ 自由飞行锁定 Z 旋转，吸附时解锁
             rb.constraints |= RigidbodyConstraints2D.FreezeRotation;
         }
@@ -122,24 +130,6 @@ public class PlayerController : MonoBehaviour
     void Start()
     {
         currentEnergy = maxEnergy;
-
-        if (ropeController == null)
-            ropeController = FindObjectOfType<RopeController>();
-
-        if (otherPlayer == null)
-        {
-            PlayerController[] players = FindObjectsOfType<PlayerController>();
-            for (int i = 0; i < players.Length; i++)
-            {
-                if (players[i] != this)
-                {
-                    otherPlayer = players[i];
-                    break;
-                }
-            }
-        }
-
-        gm = FindObjectOfType<GameManager>();
 
         spawnBounce?.Play();
     }
@@ -150,6 +140,37 @@ public class PlayerController : MonoBehaviour
         if (GameManager.IsInitializing || DialogueManager.IsActive) return;
 
         // ★ 持续喷气：FixedUpdate 中直接读取 GetKey，这里不需要额外处理
+
+        if (otherPlayer == null) return;
+
+        // ★ 能量传输：按住给队友传能量（段数制，单次按住有上限）
+        KeyCode transferKey = playerIndex == 0 ? P1_Transfer : P2_Transfer;
+        bool holdingTransfer = Input.GetKey(transferKey);
+        bool transferredThisFrame = false;
+
+        if (holdingTransfer && currentEnergy > 0f && transferredThisHold < maxTransferSegments)
+        {
+            float amount = transferRate * Time.deltaTime;
+            amount = Mathf.Min(amount, currentEnergy);
+            amount = Mathf.Min(amount, maxTransferSegments - transferredThisHold);
+            float space = otherPlayer.MaxEnergy - otherPlayer.CurrentEnergy;
+            if (space > 0f)
+            {
+                amount = Mathf.Min(amount, space);
+                currentEnergy -= amount;
+                transferredThisHold += amount;
+                otherPlayer.AddEnergy(amount);
+                transferredThisFrame = true;
+            }
+        }
+
+        // 传输特效：只在能量实际流动时变色
+        if (ropeController != null)
+            ropeController.SetTransferEffect(transferredThisFrame);
+
+        // 松手重置传输计数
+        if (!holdingTransfer)
+            transferredThisHold = 0f;
 
         UpdateAnimator();
 
@@ -205,10 +226,9 @@ public class PlayerController : MonoBehaviour
             // ★ 用锚点的方向符号：+1 表示 t 增加 = 右（顺时针），-1 表示需要反转
             float moveDir = rawHorizontal * AnchorMoveSign;
 
-            float nextSurfaceT = surfaceT;
             if (Mathf.Abs(moveDir) > 0.01f)
             {
-                nextSurfaceT += moveDir * moveSpeed * Time.fixedDeltaTime;
+                surfaceT += moveDir * moveSpeed * Time.fixedDeltaTime;
                 IsJetting = true;
             }
             else
@@ -216,7 +236,6 @@ public class PlayerController : MonoBehaviour
                 IsJetting = false;
             }
 
-            surfaceT = ClampSurfaceTByRope(nextSurfaceT);
             Vector2 targetPos = AnchorSurfacePoint(surfaceT);
 
             Vector2 normal = AnchorSurfaceNormal(surfaceT);
@@ -255,13 +274,6 @@ public class PlayerController : MonoBehaviour
         }
 
         IsJetting = jetting;
-
-        // ★ 首次喷气通知 GameManager（对话条件用）
-        if (jetting && !jetpackNotified)
-        {
-            jetpackNotified = true;
-            if (gm != null) gm.OnPlayerJetpacked(playerIndex);
-        }
 
         // ★ 不再硬限速：jetForce 决定推力，linearDrag 自然限速。调 jetForce 直观可感
     }
@@ -365,15 +377,10 @@ public class PlayerController : MonoBehaviour
             rb.MoveRotation(0f);
             rb.constraints |= RigidbodyConstraints2D.FreezeRotation;
         }
-
-        // ★ 通知 GameManager（关卡0 解除吸附触发链用）
-        var gm = GameManager.Instance;
-        if (gm != null) gm.OnPlayerDetached(playerIndex);
     }
 
     /// <summary>是否已被锚点吸附</summary>
     public bool IsAnchored => isAnchored;
-
     /// <summary>当前吸附的锚点（用于碰碰车判断是否同锚点，返回 object 做引用比较）</summary>
     public object CurrentAnchor => (object)anchoredAt ?? polyAnchoredAt;
     /// <summary>当前在表面上的位置 t 值</summary>
@@ -387,77 +394,6 @@ public class PlayerController : MonoBehaviour
     float AnchorClosestT(Vector3 pos) => polyAnchoredAt != null ? polyAnchoredAt.FindClosestSurfaceT(pos) : anchoredAt.FindClosestSurfaceT(pos);
     Vector2 AnchorClosestPoint(Vector3 pos) => polyAnchoredAt != null ? polyAnchoredAt.GetClosestSurfacePoint(pos) : anchoredAt.GetClosestSurfacePoint(pos);
 
-    float ClampSurfaceTByRope(float candidateT)
-    {
-        // ★ 对方自由飞行时不限制我方移动，让绳子弹簧力自然拖动对方（链球流星锤）
-        if (otherPlayer != null && !otherPlayer.IsAnchored)
-            return candidateT;
-
-        if (ropeController == null || otherPlayer == null || !ropeController.HasConstraint)
-            return candidateT;
-
-        float limit = ropeController.ConstraintLength;
-        if (limit <= 0.0001f || float.IsNaN(limit) || float.IsInfinity(limit))
-            return candidateT;
-
-        Vector2 candidatePos = AnchorSurfacePoint(candidateT);
-        Vector2 otherPos = otherPlayer.GetRopeConstraintPosition();
-        if (!IsFinite(candidatePos) || !IsFinite(otherPos))
-            return candidateT;
-
-        float limitSq = limit * limit;
-        Vector2 candidateDelta = candidatePos - otherPos;
-        if (candidateDelta.sqrMagnitude <= limitSq)
-            return candidateT;
-
-        if (candidateDelta.sqrMagnitude > 0.0001f)
-        {
-            Vector2 projected = otherPos + candidateDelta.normalized * limit;
-            float projectedT = AnchorClosestT(projected);
-            if (!float.IsNaN(projectedT) && !float.IsInfinity(projectedT))
-            {
-                Vector2 projectedPos = AnchorSurfacePoint(projectedT);
-                float paddedLimit = limit + 0.02f;
-                if (IsFinite(projectedPos) && (projectedPos - otherPos).sqrMagnitude <= paddedLimit * paddedLimit)
-                    return projectedT;
-            }
-        }
-
-        return FindLastRopeSafeSurfaceT(surfaceT, candidateT, otherPos, limit);
-    }
-
-    float FindLastRopeSafeSurfaceT(float startT, float blockedT, Vector2 otherPos, float limit)
-    {
-        float safeT = startT;
-        float unsafeT = blockedT;
-        float limitSq = limit * limit;
-
-        for (int i = 0; i < 12; i++)
-        {
-            float midT = (safeT + unsafeT) * 0.5f;
-            Vector2 midPos = AnchorSurfacePoint(midT);
-            bool midSafe = IsFinite(midPos) && (midPos - otherPos).sqrMagnitude <= limitSq;
-
-            if (midSafe)
-                safeT = midT;
-            else
-                unsafeT = midT;
-        }
-
-        return safeT;
-    }
-
-    Vector2 GetRopeConstraintPosition()
-    {
-        return rb != null ? rb.position : (Vector2)transform.position;
-    }
-
-    static bool IsFinite(Vector2 value)
-    {
-        return !float.IsNaN(value.x) && !float.IsNaN(value.y)
-            && !float.IsInfinity(value.x) && !float.IsInfinity(value.y);
-    }
-
     /// <summary>沿表面推开一段距离（碰碰车弹开用）</summary>
     public void BumpOnSurface(float deltaT)
     {
@@ -465,7 +401,7 @@ public class PlayerController : MonoBehaviour
             surfaceT += deltaT;
     }
 
-    /// <summary>拾取能量零件时调用</summary>
+    /// <summary>拾取零件或队友传输时调用</summary>
     public void AddEnergy(float amount)
     {
         currentEnergy = Mathf.Min(maxEnergy, currentEnergy + amount);
@@ -551,9 +487,6 @@ public class PlayerController : MonoBehaviour
         isFlyingToAnchor = false;
         isAnchored = true;
 
-        // ★ 吸附通知 GameManager（对话条件用）
-        if (gm != null) gm.OnPlayerAttached(playerIndex);
-
         // ★ 忽略碰撞
         IgnoreSurfaceCollision(anchor, true);
 
@@ -633,9 +566,6 @@ public class PlayerController : MonoBehaviour
 
         isFlyingToAnchor = false;
         isAnchored = true;
-
-        // ★ 吸附通知 GameManager（对话条件用）
-        if (gm != null) gm.OnPlayerAttached(playerIndex);
 
         // ★ 忽略玩家与表面非 trigger collider 的物理碰撞，防止物理引擎推歪/推倒玩家
         IgnoreSurfaceCollision(anchor, true);

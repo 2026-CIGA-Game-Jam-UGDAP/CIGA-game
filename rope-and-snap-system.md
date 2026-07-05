@@ -36,7 +36,7 @@
 3. 绳子弯曲/拉伸刚度拉满（1.0）→ 太空绷直线
 4. **冻结两个玩家**（isKinematic = true）→ 绳子在两人之间自然就位
 5. `SetupPins()` — 粒子 0 pin 到 P1，粒子 N pin 到 P2
-6. 使用 `RopeController.ConstraintLength` = `RopeConfig.ropeLength` 作为唯一玩法约束长度
+6. 记录 `fixedRopeLength` = 当前玩家间距 ← **之后永不改变**
 7. 等 0.2s + 一次 FixedUpdate → **解冻玩家**，归零残留速度
 
 ### Obi 碰撞最小化（SwapToTinyCollider）
@@ -47,20 +47,12 @@
 ### 弹簧拉力（RopeController.FixedUpdate）
 ```
 dist = Distance(p1, p2)
-constraintLength = RopeController.ConstraintLength
-Tension01 = dist 接近 constraintLength 的紧绷比例
-
-if Tension01 >= 1:
-    currentExtendedLength = constraintLength
-else:
-    currentExtendedLength -> constraintLength
-
-if dist > constraintLength:
-    force = (dist - constraintLength) * stretchStiffness * 50
+if dist > fixedRopeLength:
+    force = (dist - fixedRopeLength) * stretchStiffness * 20
     rb1.AddForce(dir * force)
     rb2.AddForce(-dir * force)
 ```
-双向弹簧力，`stretchStiffness` 控制硬度。可见 Obi 绳长不再在超出限制时伸长到 `dist * 1.05`，避免玩家看到绳子仍松弛、实际却被直线限制卡住。
+双向弹簧力，`stretchStiffness` 控制硬度。
 
 ### 粒子同步（RopeController.LateUpdate）
 直接设置端粒子（0 和 N-1）的位置到玩家位置 + pinOffset，速度归零。
@@ -91,7 +83,7 @@ FixedUpdate: rb.AddForce(direction * jetForce, ForceMode2D.Impulse)
 ## 四、绳子 + 吸附的交互现状
 
 ### 吸附行走时
-- `PlayerController.FixedUpdate` 先计算候选 `surfaceT`，再用同一个 `RopeController.ConstraintLength` 做预防式 clamp，最后才 `rb.MovePosition`
+- **rb.MovePosition** 设绝对位置 → 绳子弹簧力加到 rb 上但下一帧被覆盖 → 绳子拉不住
 - 碰碰车：两个吸附玩家相撞 → 沿表面推开（BumpOnSurface）
 
 ### 自由飞行时
@@ -119,12 +111,12 @@ FixedUpdate: rb.AddForce(direction * jetForce, ForceMode2D.Impulse)
 
 ---
 
-## 六、正确方向（已实施）
+## 六、正确方向（待实施）
 
 ### 绳子约束吸附走路
 在 `PlayerController.FixedUpdate` 锚点分支内，计算候选 `surfaceT` 对应的世界位置，检验与另一个玩家的距离：
-- `dist <= ConstraintLength` → 正常移动
-- `dist > ConstraintLength` → **clamp surfaceT**：把候选位置投影到以队友为圆心、绳长为半径的圆上，再反查表面的最近 T 值；如果反查位置仍越界，使用二分搜索找当前步内最后一个安全 `surfaceT`
+- `dist <= fixedRopeLength` → 正常移动
+- `dist > fixedRopeLength` → **clamp surfaceT**：把候选位置投影到以队友为圆心、绳长为半径的圆上，再反查表面的最近 T 值
 
 这样绳子约束是"预防式"的（移动前 check），而不是"治疗式"的（移动后拉回）。
 
