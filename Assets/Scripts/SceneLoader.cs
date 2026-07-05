@@ -10,7 +10,9 @@ public enum GameScene
     Level0,
     Level1,
     Level2,
-    Level3
+    Level3,
+    Level4,
+    End
 }
 
 public static class SceneLoader
@@ -29,6 +31,8 @@ public static class SceneLoader
             case GameScene.Level1: return "Level1";
             case GameScene.Level2: return "Level2";
             case GameScene.Level3: return "Level3";
+            case GameScene.Level4: return "Level4";
+            case GameScene.End:    return "End";
             default:               return "Lobby";
         }
     }

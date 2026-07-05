@@ -670,6 +670,8 @@ public class PlayerController : MonoBehaviour
 
         spriteFlash?.Flash();
         cameraShake?.Shake(0.3f);
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayPlayerCollision(transform.position);
     }
 
     // ---- TA 效果（保留接口，直接调用）----

@@ -98,6 +98,9 @@ public class DialogueManager : MonoBehaviour
         dialoguePanel.SetActive(true);
         Time.timeScale = 0f;
 
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.PlayDialogueTyping();
+
         ShowLine(currentDialogue.lines[0]);
     }
 
@@ -275,6 +278,9 @@ public class DialogueManager : MonoBehaviour
     {
         if (typewriter != null && typewriter.isShowingText)
             typewriter.SkipTypewriter();
+
+        if (AudioManager.Instance != null)
+            AudioManager.Instance.StopDialogueTyping();
 
         dialoguePanel.SetActive(false);
 

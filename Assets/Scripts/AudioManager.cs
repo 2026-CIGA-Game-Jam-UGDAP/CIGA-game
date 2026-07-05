@@ -19,6 +19,7 @@ public class AudioManager : MonoBehaviour
     public AudioClip energyPickupClip;
     public AudioClip partPickupClip;
     public AudioClip allCollectedClip;
+    public AudioClip dialogueTypingClip;
 
     // ============ 3D 音效 Clip（空间化） ============
     [Header("3D 空间音效")]
@@ -26,6 +27,7 @@ public class AudioManager : MonoBehaviour
     public AudioClip[] footstepMoonClips;
     public AudioClip[] footstepRocketClips;
     public AudioClip adsorptionClip;
+    public AudioClip playerCollisionClip;
 
     [Header("3D 音源池")]
     [Tooltip("3D one-shot 音源数量（脚步、吸附等并发上限）")]
@@ -33,6 +35,8 @@ public class AudioManager : MonoBehaviour
 
     // ---- 内部 ----
     AudioSource uiSource;
+    AudioSource bgmSource;
+    AudioSource dialogueSource;
     AudioSource[] pool3D;
     int poolIndex;
 
@@ -50,10 +54,22 @@ public class AudioManager : MonoBehaviour
         Instance = this;
         DontDestroyOnLoad(gameObject);
 
-        // 2D 音源：挂在自身
+        // 2D 音源（UI SFX）：挂在自身
         uiSource = gameObject.AddComponent<AudioSource>();
         uiSource.spatialBlend = 0f;
         uiSource.playOnAwake = false;
+
+        // 2D 音源（BGM，循环）：挂在自身
+        bgmSource = gameObject.AddComponent<AudioSource>();
+        bgmSource.spatialBlend = 0f;
+        bgmSource.loop = true;
+        bgmSource.playOnAwake = false;
+
+        // 2D 音源（对话）：挂在自身，不叠加、可打断，非循环
+        dialogueSource = gameObject.AddComponent<AudioSource>();
+        dialogueSource.spatialBlend = 0f;
+        dialogueSource.loop = false;
+        dialogueSource.playOnAwake = false;
 
         // 3D 音源池：每个是子 GameObject
         pool3D = new AudioSource[poolSize];
@@ -102,6 +118,12 @@ public class AudioManager : MonoBehaviour
     public void PlayAdsorption(Vector3 worldPos)
     {
         Play3DOneShot(adsorptionClip, worldPos);
+    }
+
+    /// <summary>在指定位置播放玩家碰撞音效</summary>
+    public void PlayPlayerCollision(Vector3 worldPos)
+    {
+        Play3DOneShot(playerCollisionClip, worldPos);
     }
 
     /// <summary>在指定位置播放脚步声。isMoon=true 月球表面，false=火箭表面</summary>
@@ -153,6 +175,49 @@ public class AudioManager : MonoBehaviour
         src.Stop();
         src.clip = null;
         thrusterSources.Remove(player);
+    }
+
+    // ==================== BGM ====================
+
+    /// <summary>播放/切换背景音乐。传 null 则停止。</summary>
+    public void PlayBGM(AudioClip clip)
+    {
+        if (clip == null)
+        {
+            StopBGM();
+            return;
+        }
+
+        // 同一个 clip 不重复触发
+        if (bgmSource.clip == clip && bgmSource.isPlaying) return;
+
+        bgmSource.clip = clip;
+        bgmSource.Play();
+    }
+
+    /// <summary>停止背景音乐</summary>
+    public void StopBGM()
+    {
+        bgmSource.Stop();
+        bgmSource.clip = null;
+    }
+
+    // ==================== 对话音效 ====================
+
+    /// <summary>开始对话音效（循环）。重复调用不会叠加，同一个 source 直接重播。</summary>
+    public void PlayDialogueTyping()
+    {
+        if (dialogueTypingClip == null) return;
+        if (dialogueSource.isPlaying) return; // 不叠加
+        dialogueSource.clip = dialogueTypingClip;
+        dialogueSource.Play();
+    }
+
+    /// <summary>停止对话音效（可随时打断）</summary>
+    public void StopDialogueTyping()
+    {
+        dialogueSource.Stop();
+        dialogueSource.clip = null;
     }
 
     // ==================== 脚步接力（Animation Event 调用） ====================

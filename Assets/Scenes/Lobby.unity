@@ -726,6 +726,51 @@ CanvasRenderer:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1233939840}
   m_CullTransparentMesh: 1
+--- !u!1 &1505669455
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1505669456}
+  - component: {fileID: 1505669457}
+  m_Layer: 0
+  m_Name: SceneBGM
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1505669456
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1505669455}
+  serializedVersion: 2
+  m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1505669457
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1505669455}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8d6654ffcbe14324bb1a80c880e76102, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  bgmClip: {fileID: 8300000, guid: 98a19141aa0a2134faa8189a65f29a90, type: 3}
 --- !u!1 &1533231379
 GameObject:
   m_ObjectHideFlags: 0
@@ -1273,6 +1318,7 @@ MonoBehaviour:
   energyPickupClip: {fileID: 8300000, guid: 5804ad50c859a03408e0732ebda0a6b8, type: 3}
   partPickupClip: {fileID: 8300000, guid: 7e0507217469cdf409912055cdc49852, type: 3}
   allCollectedClip: {fileID: 8300000, guid: 45140739387ce5048b5cfc533154d6ee, type: 3}
+  dialogueTypingClip: {fileID: 8300000, guid: 5b8277945588fbe4abd6f72ef37f1fd1, type: 3}
   thrusterLoopClip: {fileID: 8300000, guid: 1dc0455e6a4478e449fe7322b47d30e6, type: 3}
   footstepMoonClips:
   - {fileID: 8300000, guid: 632c41e1dc955d549bf4d35d97c5e6d4, type: 3}
@@ -1290,7 +1336,8 @@ MonoBehaviour:
   - {fileID: 8300000, guid: c78212d03d328ba4fb2634ccf18d3cd9, type: 3}
   - {fileID: 8300000, guid: d076b87e50af4064d8dacc380635e87f, type: 3}
   - {fileID: 8300000, guid: 9200d266668d78b429360998de6cad53, type: 3}
-  adsorptionClip: {fileID: 8300000, guid: 7aed1e6ed573418459f1b20270416d1f, type: 3}
+  adsorptionClip: {fileID: 8300000, guid: ebc908d58ab18d14dbe434cf0ef4c715, type: 3}
+  playerCollisionClip: {fileID: 8300000, guid: 5e6de14c6f19a1145a352e97fc3d9e6e, type: 3}
   poolSize: 6
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
@@ -1300,4 +1347,5 @@ SceneRoots:
   - {fileID: 890390172}
   - {fileID: 2002136199}
   - {fileID: 2049135139}
+  - {fileID: 1505669456}
   - {fileID: 920913425}
