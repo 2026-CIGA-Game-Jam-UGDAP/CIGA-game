@@ -120,8 +120,6 @@ public class PlayerController : MonoBehaviour
             // ★ 太空：无重力 + 低阻尼漂浮
             rb.gravityScale = 0f;
             rb.drag = linearDrag;
-            // ★ 关插值：否则吸附 MovePosition 时 transform.position（Sprite 用）≠ rb.position（绳子用）
-            rb.interpolation = RigidbodyInterpolation2D.None;
             // ★ 自由飞行锁定 Z 旋转，吸附时解锁
             rb.constraints |= RigidbodyConstraints2D.FreezeRotation;
         }

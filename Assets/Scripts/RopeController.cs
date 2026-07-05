@@ -51,10 +51,6 @@ public class RopeController : MonoBehaviour
     float lastAppliedBendingStiffness = -1f;
     float lastAppliedTearResistance = -1f;
 
-    // 动态绳长：绷直时伸长，始终向 config.ropeLength 回归
-    float currentExtendedLength;
-    float lastSyncedLength = -1f;
-
     bool ropeBroken;
     bool pinsSetup;
     int lastUsedParticles;
@@ -128,11 +124,6 @@ public class RopeController : MonoBehaviour
         lastAppliedTearResistance = -1f;
 
         ApplyConfigIfChanged();
-
-        // 动态绳长初始化为基准绳长
-        currentExtendedLength = config != null ? config.ropeLength : rope.RestLength;
-        lastSyncedLength = currentExtendedLength;
-        if (cursor != null) cursor.ChangeLength(currentExtendedLength);
     }
 
     void SetupPins()
@@ -224,9 +215,8 @@ public class RopeController : MonoBehaviour
     }
 
     /// <summary>
-    /// 动态绳长 + 弹簧拉力。
-    /// 绷直时绳长即时伸长（+5% 余量），始终以 recoverySpeed 向 config.ropeLength 回归。
-    /// 弹簧始终用 config.ropeLength 做阈值，不因绳长变化而改变拉力判定。
+    /// 弹簧拉力：玩家间距超过基准绳长时双向拉回。
+    /// 绳子不主动调 cursor 伸长——Obi pin 约束 + 距离约束自然拉伸。
     /// </summary>
     void FixedUpdate()
     {
@@ -236,33 +226,13 @@ public class RopeController : MonoBehaviour
         Vector3 p2 = rb2.transform.position;
         float dist = Vector3.Distance(p1, p2);
 
-        // === 动态绳长：绷直伸长，始终向原始绳长回归 ===
-        if (dist > currentExtendedLength)
-        {
-            currentExtendedLength = dist * 1.05f;
-        }
-
-        // 始终向原始绳长回归——绳子"想"回到默认长度
-        float recoverySpeed = 2f;
-        currentExtendedLength = Mathf.MoveTowards(
-            currentExtendedLength,
-            config.ropeLength,
-            recoverySpeed * Time.fixedDeltaTime);
-
-        // 推送变更到 Obi（阈值避免频繁增删粒子）
-        if (cursor != null && Mathf.Abs(currentExtendedLength - lastSyncedLength) > 0.15f)
-        {
-            lastSyncedLength = currentExtendedLength;
-            cursor.ChangeLength(currentExtendedLength);
-        }
-
-        // === 弹簧拉力（始终用 config.ropeLength 做阈值）===
         if (dist > config.ropeLength)
         {
             Vector3 dir = (p2 - p1).normalized;
             float stretch = dist - config.ropeLength;
             float force = stretch * config.stretchStiffness * 50f;
 
+            // 双向弹簧
             rb1.AddForce(dir * force, ForceMode2D.Force);
             rb2.AddForce(-dir * force, ForceMode2D.Force);
         }
@@ -312,12 +282,10 @@ public class RopeController : MonoBehaviour
         // 绳子必须已初始化（有粒子 + 约束批次）
         if (!rope.Initialized) return;
 
-        // --- 绳长（Inspector 改基准绳长时重置动态伸长）---
+        // --- 绳长（只在值变化时调 ChangeLength）---
         if (!Mathf.Approximately(config.ropeLength, lastAppliedLength))
         {
             lastAppliedLength = config.ropeLength;
-            currentExtendedLength = config.ropeLength;
-            lastSyncedLength = -1f;
             if (cursor != null)
                 cursor.ChangeLength(config.ropeLength);
         }
@@ -357,16 +325,12 @@ public class RopeController : MonoBehaviour
         }
     }
 
-    /// <summary>GameManager 重来后调用，重置断裂状态和动态绳长</summary>
+    /// <summary>GameManager 重来后调用，重置断裂状态</summary>
     public void ResetRope()
     {
         ropeBroken = false;
         if (rope != null)
             lastUsedParticles = rope.UsedParticles;
-
-        // 重置动态绳长，强制下次 FixFixedUpdate 推送
-        currentExtendedLength = config != null ? config.ropeLength : currentExtendedLength;
-        lastSyncedLength = -1f;
     }
 
     /// <summary>传输能量时绳子变色特效。PlayerController 按住/松开传输键时调用。</summary>
