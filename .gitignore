@@ -132,5 +132,14 @@ TestResults/
 # .trae\rules
 .trae
  
-.claude/settings.local.json
+# Claude Code
+.claude/
+
+# Agent workspace
+agent-sprite-forge/
+
+# Design docs (not game assets)
+docs/
+Assets/Docs/
+
 MirrorExamplesPipelineConverted.txt
