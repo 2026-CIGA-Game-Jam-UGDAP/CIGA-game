@@ -62,8 +62,9 @@ public class DialogueManager : MonoBehaviour
     [Tooltip("立绘淡入淡出时长（秒）")]
     public float portraitFadeDuration = 0.3f;
 
-    [Header("输入")]
-    [Tooltip("推进对话按键 — 见 PlayerController.DialogueAdvance / DialogueAdvanceAlt")]
+    [Header("特殊对话控制")]
+    [Tooltip("为 true 时允许用操作键（Shift/Enter）推进对话，由 GameManager 在触发吸附教程对话前设置")]
+    public bool allowActionKeyAdvance;
 
     // 内部状态
     DialogueSO currentDialogue;
@@ -104,7 +105,15 @@ public class DialogueManager : MonoBehaviour
     {
         if (!IsActive) return;
 
-        if (Input.GetKeyDown(PlayerController.DialogueAdvance) || Input.GetKeyDown(PlayerController.DialogueAdvanceAlt))
+        bool advancePressed = Input.GetKeyDown(PlayerController.DialogueAdvance);
+
+        // 吸附教程对话允许用操作键（Shift/Enter）推进
+        if (allowActionKeyAdvance)
+        {
+            advancePressed |= Input.GetKeyDown(KeyCode.LeftShift) || Input.GetKeyDown(KeyCode.Return);
+        }
+
+        if (advancePressed)
         {
             if (!lineFullyShown)
                 CompleteTyping();
@@ -277,6 +286,8 @@ public class DialogueManager : MonoBehaviour
         dialogueText.alignment = defaultAlignment;
 
         Time.timeScale = 1f;
+
+        allowActionKeyAdvance = false;
 
         var done = currentDialogue;
         currentDialogue = null;

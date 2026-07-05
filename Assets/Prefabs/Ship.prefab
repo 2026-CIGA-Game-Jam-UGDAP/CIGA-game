@@ -91,6 +91,8 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gameManager: {fileID: 0}
+  otherDock: {fileID: 2500287672244478638}
+  waitingText: {fileID: 0}
 --- !u!1 &6784200494662008202
 GameObject:
   m_ObjectHideFlags: 0
@@ -537,3 +539,5 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   gameManager: {fileID: 0}
+  otherDock: {fileID: 7683586277341814202}
+  waitingText: {fileID: 0}

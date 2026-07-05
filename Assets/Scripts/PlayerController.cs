@@ -373,6 +373,7 @@ public class PlayerController : MonoBehaviour
 
     /// <summary>是否已被锚点吸附</summary>
     public bool IsAnchored => isAnchored;
+
     /// <summary>当前吸附的锚点（用于碰碰车判断是否同锚点，返回 object 做引用比较）</summary>
     public object CurrentAnchor => (object)anchoredAt ?? polyAnchoredAt;
     /// <summary>当前在表面上的位置 t 值</summary>

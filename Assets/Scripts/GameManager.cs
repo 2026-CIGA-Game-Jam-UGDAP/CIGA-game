@@ -80,12 +80,18 @@ public class GameManager : MonoBehaviour
     public DialogueSO afterExitDialogue;
     [Tooltip("（关卡0）两个玩家都补充能量后播放的对话")]
     public DialogueSO afterRechargeDialogue;
+    [Tooltip("（关卡0）补充能量后，指引前往飞船的对话")]
+    public DialogueSO afterRechargeGoToShipDialogue;
     [Tooltip("（关卡0）两个玩家都到达飞船后播放的对话")]
     public DialogueSO afterReachShipDialogue;
     [Tooltip("（关卡1+）收集完所有零件后播放的对话")]
     public DialogueSO afterCollectDialogue;
     [Tooltip("陨石撞击后播放的对话")]
     public DialogueSO afterMeteorDialogue;
+
+    [Header("能量说明")]
+    [Tooltip("能量站教程对话，独立于对话链")]
+    public DialogueSO energyTutorialDialogue;
 
     [Header("重来效果")]
     [Tooltip("全屏黑色遮罩 Image（用于淡入淡出）")]
@@ -105,9 +111,14 @@ public class GameManager : MonoBehaviour
     bool jetpackDialogueTriggered;
     bool exitDialogueTriggered;
     bool rechargeDialogueTriggered;
+    bool goToShipDialogueTriggered;
     bool reachShipDialogueTriggered;
     bool collectDialogueTriggered;
     bool meteorDialogueTriggered;
+
+    // 能量教程状态（独立于对话链）
+    bool energyTutorialPending;
+    bool energyTutorialTriggered;
 
     // 玩家操作标志（其他脚本设置）
     [System.NonSerialized] public bool player1Jetpacked;
@@ -318,6 +329,12 @@ public class GameManager : MonoBehaviour
         // 等动画播完
         yield return new WaitForSeconds(shipAnimDuration);
 
+        // 标记已发射，阻止重复触发
+        if (dockTrigger1 != null)
+            dockTrigger1.MarkLaunched();
+        if (dockTrigger2 != null)
+            dockTrigger2.MarkLaunched();
+
         // 关闭两个对接触发器
         if (dockTrigger1 != null)
             dockTrigger1.gameObject.SetActive(false);
@@ -344,6 +361,15 @@ public class GameManager : MonoBehaviour
         if (DialogueManager.Instance == null || DialogueManager.IsActive) return;
         if (!enterDialogueReady) return;
 
+        // 能量教程对话：独立于链，待触发时在当前对话空隙中弹出
+        if (energyTutorialPending && energyTutorialDialogue != null)
+        {
+            energyTutorialPending = false;
+            energyTutorialTriggered = true;
+            DialogueManager.Instance.StartDialogue(energyTutorialDialogue);
+            return;
+        }
+
         // 1. 关卡进入对话（自动触发一次）
         if (!enterDialoguePlayed && enterDialogue != null)
         {
@@ -352,36 +378,37 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 2. 首次解除吸附对话（关卡0：两个人都脱离初始吸附后）
+        // 2. 首次解除吸附对话（关卡0：一人脱离初始吸附后即可触发）
         if (enterDialoguePlayed && !detachDialogueTriggered &&
-            player1DetachCount >= 1 && player2DetachCount >= 1 && afterDetachDialogue != null)
+            (player1DetachCount >= 1 || player2DetachCount >= 1) && afterDetachDialogue != null)
         {
             detachDialogueTriggered = true;
+            DialogueManager.Instance.allowActionKeyAdvance = true;
             DialogueManager.Instance.StartDialogue(afterDetachDialogue);
             return;
         }
 
-        // 3. 吸附对话（两个人都吸附后）
+        // 3. 吸附对话（一人吸附后即可触发）
         if (detachDialogueTriggered && !attachDialogueTriggered &&
-            player1Attached && player2Attached && afterAttachDialogue != null)
+            (player1Attached || player2Attached) && afterAttachDialogue != null)
         {
             attachDialogueTriggered = true;
             DialogueManager.Instance.StartDialogue(afterAttachDialogue);
             return;
         }
 
-        // 4. 二次解除吸附对话（关卡0：喷气背包教程前先解除吸附）
+        // 4. 二次解除吸附对话（关卡0：一人再次解除吸附后即可触发喷气背包教程）
         if (attachDialogueTriggered && !detach2DialogueTriggered &&
-            player1DetachCount >= 2 && player2DetachCount >= 2 && afterDetach2Dialogue != null)
+            (player1DetachCount >= 2 || player2DetachCount >= 2) && afterDetach2Dialogue != null)
         {
             detach2DialogueTriggered = true;
             DialogueManager.Instance.StartDialogue(afterDetach2Dialogue);
             return;
         }
 
-        // 5. 喷气背包对话（两个人都喷气后）
+        // 5. 喷气背包对话（一人喷气后即可触发）
         if (detach2DialogueTriggered && !jetpackDialogueTriggered &&
-            player1Jetpacked && player2Jetpacked && afterJetpackDialogue != null)
+            (player1Jetpacked || player2Jetpacked) && afterJetpackDialogue != null)
         {
             jetpackDialogueTriggered = true;
             DialogueManager.Instance.StartDialogue(afterJetpackDialogue);
@@ -397,17 +424,26 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 7. 补充能量对话（关卡0：两个人都补充能量后）
+        // 7. 补充能量对话（关卡0：一人补充能量后即可触发）
         if (exitDialogueTriggered && !rechargeDialogueTriggered &&
-            player1Recharged && player2Recharged && afterRechargeDialogue != null)
+            (player1Recharged || player2Recharged) && afterRechargeDialogue != null)
         {
             rechargeDialogueTriggered = true;
             DialogueManager.Instance.StartDialogue(afterRechargeDialogue);
             return;
         }
 
+        // 7.5 指引前往飞船对话（关卡0：补充能量对话结束后自动弹出）
+        if (rechargeDialogueTriggered && !goToShipDialogueTriggered &&
+            afterRechargeGoToShipDialogue != null)
+        {
+            goToShipDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterRechargeGoToShipDialogue);
+            return;
+        }
+
         // 8. 到达飞船对话（关卡0）
-        if (rechargeDialogueTriggered && !reachShipDialogueTriggered &&
+        if (goToShipDialogueTriggeredOrSkipped() && !reachShipDialogueTriggered &&
             player1ReachedShip && player2ReachedShip && afterReachShipDialogue != null)
         {
             reachShipDialogueTriggered = true;
@@ -463,6 +499,12 @@ public class GameManager : MonoBehaviour
         return afterRechargeDialogue == null || rechargeDialogueTriggered;
     }
 
+    /// <summary>如果场景中没填 afterRechargeGoToShipDialogue 资产，视为已触发</summary>
+    bool goToShipDialogueTriggeredOrSkipped()
+    {
+        return afterRechargeGoToShipDialogue == null || goToShipDialogueTriggered;
+    }
+
     /// <summary>PlayerController 调用：玩家解除了吸附</summary>
     public void OnPlayerDetached(int playerIndex)
     {
@@ -508,6 +550,13 @@ public class GameManager : MonoBehaviour
     public void OnMeteorImpact()
     {
         meteorImpactTriggered = true;
+    }
+
+    /// <summary>EnergyTutorialTrigger 调用：玩家进入能量站范围，设置待触发标记</summary>
+    public void TriggerEnergyTutorial()
+    {
+        if (energyTutorialTriggered) return;
+        energyTutorialPending = true;
     }
 
     // ==================== 最近锚点查找 ====================
