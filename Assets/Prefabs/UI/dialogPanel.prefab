@@ -316,6 +316,7 @@ MonoBehaviour:
   typewriter: {fileID: 0}
   pressHint: {fileID: 0}
   portraitFadeDuration: 0.3
+  allowActionKeyAdvance: 0
 --- !u!1 &6922440892184582184
 GameObject:
   m_ObjectHideFlags: 0

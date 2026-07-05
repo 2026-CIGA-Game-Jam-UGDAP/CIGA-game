@@ -78,6 +78,9 @@ public class Meteor : MonoBehaviour
         // TA 反馈
         player.PlayHitFeedback(transform.position, 1f);
 
+        // 全屏 Bloom 爆发
+        PostProcessController.Flash(4f, 0.15f);
+
         Destroy(gameObject);
     }
 

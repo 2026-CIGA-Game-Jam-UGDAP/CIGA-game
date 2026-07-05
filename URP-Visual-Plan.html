@@ -270,6 +270,89 @@
   </div>
 </div>
 
+<h2>📂 已创建文件清单</h2>
+<table>
+  <tr><th>文件</th><th>说明</th><th>状态</th></tr>
+  <tr><td><code>Assets/Scripts/Editor/PostProcessSetup.cs</code></td><td>一键搭建脚本 — 创建 Volume Profile、光晕材质、修改星球 Prefab 和场景</td><td><span class="tag green">✅ 已创建</span></td></tr>
+  <tr><td><code>Assets/Scripts/PostProcessController.cs</code></td><td>运行时闪白控制器 — PostProcessController.Flash(4f, 0.15f)</td><td><span class="tag green">✅ 已创建</span></td></tr>
+  <tr><td><code>Assets/Scripts/Meteor.cs</code></td><td>陨石砸中时调用 PostProcessController.Flash()</td><td><span class="tag green">✅ 已修改</span></td></tr>
+  <tr><td>7 个 Pipeline Asset</td><td>HDR 全部开启（Bloom 前置依赖）</td><td><span class="tag green">✅ 已修改</span></td></tr>
+  <tr><td><code>Assets/Settings/Profiles/Profile_*.asset</code></td><td>5 场景 Volume Profile（Level1/2/3/4/Lobby）</td><td><span class="tag orange">⚡ 脚本生成</span></td></tr>
+  <tr><td><code>Assets/Art/VFX/PlanetGlow.png</code></td><td>256×256 径向渐变光晕贴图（程序化生成）</td><td><span class="tag orange">⚡ 脚本生成</span></td></tr>
+  <tr><td><code>Assets/Art/VFX/PlanetGlow.mat</code></td><td>光晕材质（Sprite-Unlit-Default）</td><td><span class="tag orange">⚡ 脚本生成</span></td></tr>
+  <tr><td>6 个星球 Prefab</td><td>球1~球6 各加 Glow 子对象</td><td><span class="tag orange">⚡ 脚本修改</span></td></tr>
+  <tr><td>5 个场景</td><td>Level1~4 + Lobby 各加 PostProcessVolume GameObject</td><td><span class="tag orange">⚡ 脚本修改</span></td></tr>
+</table>
+
+<h2>▶️ 你现在要做的事</h2>
+
+<div class="card highlight">
+  <h3 style="margin-top:0">Step 1 — 运行搭建脚本（1 分钟）</h3>
+  <ol>
+    <li>打开 Unity Editor</li>
+    <li>等编译完成（右下角进度条消失）</li>
+    <li>菜单栏 <strong>Tools → Setup Post Processing</strong></li>
+    <li>观察 Console 日志确认所有步骤完成</li>
+  </ol>
+</div>
+
+<div class="card highlight">
+  <h3 style="margin-top:0">Step 2 — 目测调参（5-10 分钟）</h3>
+  <ol>
+    <li>打开 <strong>Level1</strong>，选中 <code>PostProcessVolume</code></li>
+    <li>在 Inspector 里展开 Volume Profile，逐个调：<br>
+      <strong>Bloom → Threshold</strong>：控制什么亮度才发光（0.5~0.9）<br>
+      <strong>Bloom → Intensity</strong>：辉光有多强（0.3~1.0）<br>
+      <strong>Color Adjustments → Color Filter</strong>：场景主色调<br>
+      <strong>Vignette → Intensity</strong>：暗角深浅（0.2~0.5）</li>
+    <li>跑起来看效果，边看边调</li>
+  </ol>
+</div>
+
+<div class="card highlight">
+  <h3 style="margin-top:0">Step 3 — 逐场景验证</h3>
+  <ol>
+    <li>依次打开 Level1 → Level2 → Level3 → Level4 → Lobby</li>
+    <li>检查无材质丢失（粉色方块）、无渲染异常</li>
+    <li>各自微调 Volume Profile 的 Color Filter</li>
+  </ol>
+</div>
+
+<div class="card highlight">
+  <h3 style="margin-top:0">Step 4 — 测试陨石闪白</h3>
+  <ol>
+    <li>打开 <strong>Level3</strong>（有陨石的场景）</li>
+    <li>运行，让陨石砸中玩家</li>
+    <li>确认全屏 Bloom 爆发效果（0.15 秒快速闪光）</li>
+    <li>如需调整强度/时长 → 选中 PostProcessVolume，修改 PostProcessController 的 Default Flash Intensity/Duration</li>
+  </ol>
+</div>
+
+<div class="card warn">
+  <h3 style="margin-top:0">Step 5（可选）— 替换光晕贴图</h3>
+  <p>脚本生成的 PlanGlow.png 是程序化渐变的，能用但不够精致。如果你想要更好的效果：</p>
+  <ol>
+    <li>在 PS/Aseprite 里画 256×256 径向渐变（白心 → 透明边）</li>
+    <li>导出 PNG，覆盖 <code>Assets/Art/VFX/PlanetGlow.png</code></li>
+    <li>Unity 会自动重新导入</li>
+  </ol>
+</div>
+
+<h2>🎮 陨石闪白调用方式</h2>
+<div class="card">
+  <p>已在 <code>Meteor.cs</code> 的 <code>OnTriggerEnter2D</code> 中自动调用。其他地方要用：</p>
+  <br>
+  <code>PostProcessController.Flash(4f, 0.15f);</code><br><br>
+  <p>参数 1 = Bloom Intensity（默认 4），参数 2 = 持续时间秒（默认 0.15）。</p>
+  <br>
+  <p>其他地方想加闪白：</p>
+  <ul>
+    <li>爆炸 → <code>PostProcessController.Flash(6f, 0.2f);</code></li>
+    <li>轻微碰撞 → <code>PostProcessController.Flash(2f, 0.08f);</code></li>
+    <li>通关 → <code>PostProcessController.Flash(3f, 0.5f);</code></li>
+  </ul>
+</div>
+
 <h2>🚀 进阶扩展（后续考虑）</h2>
 <table>
   <tr><th>效果</th><th>方式</th><th>优先级</th></tr>
@@ -291,14 +374,14 @@
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0">2D Renderer vs Forward Renderer</h3>
-  <p>URP 对 2D 游戏有两个选择：<strong>2D Renderer</strong>（支持 2D Light、2D Shadow、Sorting Layer 光照）和 <strong>Forward Renderer</strong>（传统 3D 渲染路径但也能渲染 Sprite）。推荐用 2D Renderer 因为你的场景全是 Sprite，且后续可以加 2D Light 做局部光照（如爆炸闪光、喷气光源）。</p>
+  <h3 style="margin-top:0">Bloom Threshold 和星球光晕的关系</h3>
+  <p>核心技巧：光晕 Sprite 的顶点色/贴图亮度必须 > Bloom Threshold 才会发光。<br>
+  具体操作：使用 <code>Sprite-Unlit-Default</code> 材质（不受光照影响，始终全亮输出），光晕 Sprite 设置为白色渐变，亮度超过 Threshold 自动被 Bloom "点燃"。</p>
 </div>
 
 <div class="card">
-  <h3 style="margin-top:0">Bloom Threshold 和星球光晕的关系</h3>
-  <p>核心技巧：光晕 Sprite 的顶点色/贴图亮度必须 > Bloom Threshold 才会发光。<br>
-  具体操作：使用 Unity 默认的 <code>Sprite-Lit-Default</code> 材质，光晕 Sprite 设置为纯白色（255,255,255），加上半透明径向渐变，就足够亮了。如果想更强的光晕，可以用 <code>Sprite-Unlit-Default</code> 材质（不受光照影响，始终全亮输出）。</p>
+  <h3 style="margin-top:0">闪白架构</h3>
+  <p><code>PostProcessController</code> 在每个场景的 PostProcessVolume 上，维护一个独立的子 Volume（_FlashVolume）专门用于临时效果。闪白时激活该 Volume，用 Bloom Intensity 动画从高值（如 4）快速 lerp 到 0。闪白 Volume 的 Bloom Threshold = 0（所有像素都发光），与全局 Bloom（Threshold 0.8，只让亮的发光）互补。</p>
 </div>
 
 <hr>

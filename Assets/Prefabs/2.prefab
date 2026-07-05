@@ -149,3 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   speedBonus: 3
+  popupColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
+  popupFontSize: 5
+  popupDuration: 2
+  popupFloatHeight: 1
