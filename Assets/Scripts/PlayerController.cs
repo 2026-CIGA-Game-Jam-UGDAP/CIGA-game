@@ -40,8 +40,8 @@ public class PlayerController : MonoBehaviour
     public float moveSpeed = 3f;
     [Tooltip("惯性阻尼。越小越滑（太空漂浮感），0.05=明显漂浮，1=立刻停下")]
     public float linearDrag = 0.05f;
-    [Tooltip("吸附后转身角速度（度/秒），值越小转身越平滑")]
-    public float turnSpeed = 180f;
+    [Tooltip("吸附后转身角速度（度/秒），值越小转身越平滑。高速绕小星球需要较高值才能跟上表面法线变化")]
+    public float turnSpeed = 720f;
 
     [Header("能量")]
     [Tooltip("能量段数上限")]
@@ -388,6 +388,10 @@ public class PlayerController : MonoBehaviour
 
     float ClampSurfaceTByRope(float candidateT)
     {
+        // ★ 对方自由飞行时不限制我方移动，让绳子弹簧力自然拖动对方（链球流星锤）
+        if (otherPlayer != null && !otherPlayer.IsAnchored)
+            return candidateT;
+
         if (ropeController == null || otherPlayer == null || !ropeController.HasConstraint)
             return candidateT;
 
