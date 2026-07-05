@@ -78,6 +78,8 @@ public class GameManager : MonoBehaviour
     public DialogueSO afterJetpackDialogue;
     [Tooltip("（关卡0）玩家到达外部平台后播放的对话")]
     public DialogueSO afterExitDialogue;
+    [Tooltip("（关卡0）玩家靠近出入口，提示需要同时站在标记区域")]
+    public DialogueSO approachDockDialogue;
     [Tooltip("（关卡0）两个玩家都补充能量后播放的对话")]
     public DialogueSO afterRechargeDialogue;
     [Tooltip("（关卡0）补充能量后，指引前往飞船的对话")]
@@ -112,6 +114,8 @@ public class GameManager : MonoBehaviour
     bool detach2DialogueTriggered;
     bool jetpackDialogueTriggered;
     bool exitDialogueTriggered;
+    bool approachDockDialoguePending;
+    bool approachDockDialogueTriggered;
     bool rechargeDialogueTriggered;
     bool goToShipDialogueTriggered;
     bool reachShipDialogueTriggered;
@@ -433,6 +437,16 @@ public class GameManager : MonoBehaviour
             return;
         }
 
+        // 6.5 靠近出入口提示对话（关卡0：玩家靠近出入口时触发，提示同时站在标记区域）
+        if (exitDialogueTriggered && !approachDockDialogueTriggered &&
+            approachDockDialoguePending && approachDockDialogue != null)
+        {
+            approachDockDialoguePending = false;
+            approachDockDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(approachDockDialogue);
+            return;
+        }
+
         // 7. 补充能量对话（关卡0：一人补充能量后即可触发）
         if (exitDialogueTriggered && !rechargeDialogueTriggered &&
             (player1Recharged || player2Recharged) && afterRechargeDialogue != null)
@@ -559,6 +573,13 @@ public class GameManager : MonoBehaviour
     public void OnMeteorImpact()
     {
         meteorImpactTriggered = true;
+    }
+
+    /// <summary>出入口 Trigger 调用：玩家靠近出入口，提示需要同时站在标记区域</summary>
+    public void TriggerApproachDockDialogue()
+    {
+        if (approachDockDialogueTriggered) return;
+        approachDockDialoguePending = true;
     }
 
     /// <summary>EnergyTutorialTrigger 调用：玩家进入能量站范围，设置待触发标记</summary>
