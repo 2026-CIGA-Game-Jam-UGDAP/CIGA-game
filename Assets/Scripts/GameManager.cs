@@ -88,6 +88,8 @@ public class GameManager : MonoBehaviour
     public DialogueSO afterCollectDialogue;
     [Tooltip("陨石撞击后播放的对话")]
     public DialogueSO afterMeteorDialogue;
+    [Tooltip("结局对话（成功后播放，onComplete 挂场景切换）")]
+    public DialogueSO endingDialogue;
 
     [Header("能量说明")]
     [Tooltip("能量站教程对话，独立于对话链")]
@@ -349,8 +351,15 @@ public class GameManager : MonoBehaviour
         if (AudioManager.Instance != null)
             AudioManager.Instance.PlaySceneTransition();
 
-        if (!string.IsNullOrEmpty(nextSceneName))
+        // 有结局对话先播，onComplete 里挂场景切换；没有则直接切
+        if (endingDialogue != null && DialogueManager.Instance != null)
+        {
+            DialogueManager.Instance.StartDialogue(endingDialogue);
+        }
+        else if (!string.IsNullOrEmpty(nextSceneName))
+        {
             SceneManager.LoadScene(nextSceneName);
+        }
     }
 
     // ==================== 对话调度 ====================
