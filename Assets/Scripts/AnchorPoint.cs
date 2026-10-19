@@ -120,6 +120,8 @@ public class AnchorPoint : MonoBehaviour
 
     void Update()
     {
+        if (DialogueManager.IsActive || Time.timeScale == 0f) return;
+
         for (int i = playersInRange.Count - 1; i >= 0; i--)
             if (playersInRange[i] == null) playersInRange.RemoveAt(i);
 

@@ -1774,7 +1774,7 @@ MonoBehaviour:
   approachDockDialogue: {fileID: 0}
   afterRechargeDialogue: {fileID: 0}
   afterRechargeGoToShipDialogue: {fileID: 11400000, guid: 1701220ebdcc1dc42a870c5cc16e308d, type: 2}
-  afterReachShipDialogue: {fileID: 0}
+  afterReachShipDialogue: {fileID: 11400000, guid: bb0e9a31843a493d9bb95e6da1e8e47a, type: 2}
   afterCollectDialogue: {fileID: 11400000, guid: 97cba7f136e4a024cb6d326dd47f1a45, type: 2}
   afterMeteorDialogue: {fileID: 0}
   endingDialogue: {fileID: 0}

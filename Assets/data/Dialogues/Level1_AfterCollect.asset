@@ -22,7 +22,7 @@ MonoBehaviour:
     portrait: {fileID: 0}
     bigPortrait: {fileID: -391726316, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
   - speakerName: 
-    text: "\u6BCF\u6B21\u6536\u96C6\u7ED3\u675F\u540E\u9700\u8981\u56DE\u5230\u98DE\u8239\u4E0A\uFF01"
+    text: "零件已收集完毕！请两位玩家返回飞船。"
     portrait: {fileID: 0}
     bigPortrait: {fileID: 0}
   useTypingEffect: 0

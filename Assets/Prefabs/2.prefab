@@ -149,6 +149,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   speedBonus: 3
+  popupFont: {fileID: 11400000, guid: f7e310dd54e483c419ab86ca789c3e0d, type: 2}
   popupColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   popupFontSize: 5
   popupDuration: 2

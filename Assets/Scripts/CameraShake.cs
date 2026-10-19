@@ -42,6 +42,8 @@ public class CameraShake : MonoBehaviour
 
     void LateUpdate()
     {
+        if (Time.deltaTime <= 0f) return;
+
         // 先还原上一帧抖动偏移，避免漂移
         if (prevShakeOffset != Vector3.zero)
             camTransform.position -= prevShakeOffset;

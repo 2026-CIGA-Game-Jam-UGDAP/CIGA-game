@@ -38,6 +38,12 @@ public class RopeController : MonoBehaviour
     public GameManager gameManager;
 
     [Header("端点同步")]
+    [Tooltip("显示端点贴合 Pin；双人吸附且超过正常绳长后逐渐拉紧，靠近后恢复松弛。不改变玩家受力")]
+    public bool alignRenderedEndpoints = true;
+    [Tooltip("超过正常绳长的这一比例后，显示绳达到完全拉紧的目标。0.15 表示超过 15%")]
+    [Range(0.01f, 1f)] public float visualTighteningRatio = 0.15f;
+    [Tooltip("显示绳拉紧和恢复松弛的平滑时间（秒），只影响外观")]
+    [Min(0.01f)] public float visualTensionSmoothTime = 0.25f;
     [Tooltip("端点每帧最大同步速度，防止击飞时绳子瞬间拉长变形")]
     public float maxEndpointSnapSpeed = 30f;
 
@@ -62,6 +68,8 @@ public class RopeController : MonoBehaviour
     Color originalRopeColor;
     Material ropeMaterialInstance;
     Tweener transferTweener;
+    float visualTension;
+    float visualTensionVelocity;
 
     Rigidbody2D rb1;
     Rigidbody2D rb2;
@@ -73,6 +81,153 @@ public class RopeController : MonoBehaviour
         if (rope == null)   rope = GetComponent<ObiRope>();
         if (solver == null) solver = GetComponent<ObiSolver>();
         if (cursor == null) cursor = GetComponent<ObiRopeCursor>();
+    }
+
+    void OnEnable()
+    {
+        if (solver != null)
+            solver.OnBeforeActorsFrameEnd += AlignRenderedEndpoints;
+    }
+
+    void OnDisable()
+    {
+        if (solver != null)
+            solver.OnBeforeActorsFrameEnd -= AlignRenderedEndpoints;
+        visualTension = visualTensionVelocity = 0f;
+    }
+
+    /// <summary>
+    /// Obi 4.x 在插值后触发此事件，随后渲染器才会在 OnFrameEnd 读取 renderablePositions。
+    /// 只校正这份显示数据，保留 solver.positions / velocities 和双向 Pin 的物理反馈。
+    /// </summary>
+    void AlignRenderedEndpoints(object sender, System.EventArgs e)
+    {
+        // Cursor 缩短绳子也会触发旧的 ropeBroken 标记；显示跟随只以有效 Pin 为准。
+        // 显示修正以有效连接点为准，实际撕裂产生的中间断口仍由 Obi 渲染。
+        if (!alignRenderedEndpoints || !pinsSetup ||
+            rope == null || !rope.Initialized || !rope.InSolver || rope.Solver != solver)
+        {
+            visualTension = visualTensionVelocity = 0f;
+            return;
+        }
+
+        ObiPinConstraintBatch batch = rope.PinConstraints.GetFirstBatch();
+        if (batch == null || solver.renderablePositions == null) return;
+
+        int player1Particle = -1, player2Particle = -1;
+        Vector3 player1Target = Vector3.zero, player2Target = Vector3.zero;
+        foreach (int constraint in batch.ActiveConstraints)
+        {
+            ObiColliderBase body = batch.pinBodies[constraint];
+            if (body == null || (body != player1Collider && body != player2Collider)) continue;
+
+            // Cursor 改长度会增删中间粒子，末端不一定是 UsedParticles - 1。
+            int particle = batch.pinIndices[constraint];
+            if (particle < 0 || particle >= rope.particleIndices.Length || !rope.active[particle]) continue;
+
+            // Pin 偏移属于 Collider 局部坐标；Transform 使用与玩家画面一致的插值姿态。
+            Vector3 target = body.transform.TransformPoint(batch.pinOffsets[constraint]);
+            if (body == player1Collider) { player1Particle = particle; player1Target = target; }
+            if (body == player2Collider) { player2Particle = particle; player2Target = target; }
+        }
+
+        // 吸附本身不拉直绳子；连接点间距超过正常绳长后才逐渐拉紧。
+        float targetTension = 0f;
+        if (pc1 != null && pc2 != null && pc1.IsAnchored && pc2.IsAnchored &&
+            player1Particle >= 0 && player2Particle >= 0)
+        {
+            float normalLength = Mathf.Max(0.01f, config != null ? config.ropeLength : rope.RestLength);
+            targetTension = Mathf.InverseLerp(normalLength,
+                normalLength * (1f + Mathf.Max(0.01f, visualTighteningRatio)),
+                Vector3.Distance(player1Target, player2Target));
+        }
+
+        // 保留显示张力状态，跨过长度阈值、靠近或脱离吸附时都不瞬间切换绳形。
+        if (Time.deltaTime > 0f)
+            visualTension = Mathf.SmoothDamp(visualTension, targetTension, ref visualTensionVelocity,
+                Mathf.Max(0.01f, visualTensionSmoothTime), Mathf.Infinity, Time.deltaTime);
+        if (targetTension == 0f && visualTension < 0.0001f)
+            visualTension = visualTensionVelocity = 0f;
+
+        // 松弛或单人吸附时也要沿绳身分摊端点补偿，不能只移动最后一颗粒子。
+        if (player1Particle >= 0 && player2Particle >= 0)
+            BlendRenderedRope(player1Particle, player1Target, player2Particle, player2Target,
+                Mathf.SmoothStep(0f, 1f, visualTension));
+
+        // 缺少端点或绳子真实断裂时仍保留有效 Pin 的贴合，不连接中间断口。
+        if (player1Particle >= 0) SetRenderedPosition(player1Particle, player1Target);
+        if (player2Particle >= 0) SetRenderedPosition(player2Particle, player2Target);
+    }
+
+    void BlendRenderedRope(int player1Particle, Vector3 player1Target, int player2Particle, Vector3 player2Target, float tension)
+    {
+        ObiDistanceConstraintBatch distances = rope.DistanceConstraints.GetFirstBatch();
+        if (distances == null || distances.ConstraintCount == 0) return;
+
+        int segments = distances.ConstraintCount;
+        int firstParticle = distances.springIndices[0];
+        int lastParticle = distances.springIndices[segments * 2 - 1];
+        Vector3 start, end;
+        if (firstParticle == player1Particle && lastParticle == player2Particle)
+        {
+            start = player1Target;
+            end = player2Target;
+        }
+        else if (firstParticle == player2Particle && lastParticle == player1Particle)
+        {
+            start = player2Target;
+            end = player1Target;
+        }
+        else return;
+
+        // 按约束链而非粒子编号遍历；真实断裂后不把分离的绳段重新拉成一条线。
+        for (int i = 1; i < segments; i++)
+            if (distances.springIndices[i * 2] != distances.springIndices[i * 2 - 1]) return;
+
+        Vector3 sourceStart = solver.renderablePositions[rope.particleIndices[firstParticle]];
+        Vector3 sourceEnd = solver.renderablePositions[rope.particleIndices[lastParticle]];
+        if (segments >= 3)
+        {
+            Vector3 second = solver.renderablePositions[rope.particleIndices[distances.springIndices[1]]];
+            Vector3 third = solver.renderablePositions[rope.particleIndices[distances.springIndices[3]]];
+            Vector3 beforeLast = solver.renderablePositions[rope.particleIndices[distances.springIndices[(segments - 1) * 2]]];
+            Vector3 twoBeforeLast = solver.renderablePositions[rope.particleIndices[distances.springIndices[(segments - 2) * 2]]];
+
+            // Pin 本身已跟上玩家、相邻粒子却没跟上时，尾段也会被拉成一根长直线。
+            // 用内侧绳段推算连续的端部，再统一补偿，避免保留这个异常长段。
+            float startSpacing = Mathf.Max(Vector3.Distance(second, third), distances.restLengths[0]);
+            float endSpacing = Mathf.Max(Vector3.Distance(beforeLast, twoBeforeLast), distances.restLengths[segments - 1]);
+            float startBlend = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(startSpacing * 2f,
+                startSpacing * 4f, Vector3.Distance(sourceStart, second)));
+            float endBlend = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(endSpacing * 2f,
+                endSpacing * 4f, Vector3.Distance(sourceEnd, beforeLast)));
+            sourceStart = Vector3.Lerp(sourceStart, second + (second - third), startBlend);
+            sourceEnd = Vector3.Lerp(sourceEnd, beforeLast + (beforeLast - twoBeforeLast), endBlend);
+        }
+
+        Vector3 startCorrection = start - sourceStart;
+        Vector3 endCorrection = end - sourceEnd;
+        for (int i = 1; i < segments; i++)
+        {
+            int particle = distances.springIndices[i * 2];
+            Vector3 simulated = solver.renderablePositions[rope.particleIndices[particle]];
+            float t = i / (float)segments;
+            Vector3 aligned = simulated + Vector3.Lerp(startCorrection, endCorrection, t);
+            Vector3 taut = Vector3.Lerp(start, end, t);
+            SetRenderedPosition(particle, Vector3.Lerp(aligned, taut, tension));
+        }
+        SetRenderedPosition(firstParticle, start);
+        SetRenderedPosition(lastParticle, end);
+    }
+
+    void SetRenderedPosition(int particle, Vector3 target)
+    {
+        int solverParticle = rope.particleIndices[particle];
+        Vector4 position = solver.renderablePositions[solverParticle];
+        position.x = target.x;
+        position.y = target.y;
+        position.z = target.z;
+        solver.renderablePositions[solverParticle] = position;
     }
 
     IEnumerator Start()
@@ -269,17 +424,9 @@ public class RopeController : MonoBehaviour
     }
 
     /// <summary>
-    /// ★ 强制同步 pinned 粒子到玩家位置，消除 Obi solver 对 MovePosition 的 1-2 帧延迟。
-    /// 表面行走用 rb.MovePosition（瞬移），Obi solver 在 FixedUpdate 求解后，
-    /// 相邻粒子需要多个迭代才能追上瞬移量 → 绳端产生甩动/拉长闪烁。
-    /// 这里在渲染前直接矫正端粒子位置，绕过 solver 延迟。
-    ///
-    /// ★ 击飞保护：非吸附时端点每帧移动距离上限 = maxEndpointSnapSpeed * dt。
-    /// 陨石击飞时玩家瞬间位移巨大，若端点无限制 snap 会导致绳子拉长变形。
-    /// 限制 snap 速度后，求解器有足够时间把位移传播到中间粒子。
-    ///
-    /// ★ 吸附时强制同步：表面移动是 MovePosition 瞬移，若端点也被限速会跟不上，
-    /// 绳子拖拽玩家导致卡住。吸附状态下直接设为目标位置，不做限速。
+    /// 保留旧端点缓存同步及限速，避免改变重置、增删粒子时使用的 actor 数据。
+    /// rope.positions / velocities 是 actor 缓存，不是运行中的 solver 数据。
+    /// 可见端点由 AlignRenderedEndpoints 在 Obi 插值后校正；这里不向 solver 推送物理位置。
     /// </summary>
     void LateUpdate()
     {
@@ -379,6 +526,7 @@ public class RopeController : MonoBehaviour
     public void ResetRope()
     {
         ropeBroken = false;
+        visualTension = visualTensionVelocity = 0f;
         if (rope != null)
             lastUsedParticles = rope.UsedParticles;
     }

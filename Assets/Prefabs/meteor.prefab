@@ -165,6 +165,7 @@ MonoBehaviour:
   speed: 8
   knockbackForce: 80
   tumbleSpeed: 360
+  impactPrefab: {fileID: 7995418644533138153, guid: 29c4cc047bb99864a85feeb636f2b2a8, type: 3}
   boundsMargin: 5
   scaleRandomMin: 0.3
   scaleRandomMax: 0.5

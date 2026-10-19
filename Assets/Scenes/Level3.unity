@@ -515,7 +515,7 @@ MonoBehaviour:
   afterRechargeDialogue: {fileID: 0}
   afterRechargeGoToShipDialogue: {fileID: 0}
   afterReachShipDialogue: {fileID: 0}
-  afterCollectDialogue: {fileID: 0}
+  afterCollectDialogue: {fileID: 11400000, guid: 5e79853a7ce84f0e97b29bd046d091eb, type: 2}
   afterMeteorDialogue: {fileID: 11400000, guid: d797d0baa24edc14abe29b74832d3e17, type: 2}
   endingDialogue: {fileID: 0}
   energyTutorialDialogue: {fileID: 0}
@@ -3545,6 +3545,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   speedBonus: 3
   maxSpeedCap: 6
+  popupFont: {fileID: 11400000, guid: f7e310dd54e483c419ab86ca789c3e0d, type: 2}
   popupColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   popupFontSize: 5
   popupDuration: 2
@@ -3645,6 +3646,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   speedBonus: 3
   maxSpeedCap: 6
+  popupFont: {fileID: 11400000, guid: f7e310dd54e483c419ab86ca789c3e0d, type: 2}
   popupColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   popupFontSize: 5
   popupDuration: 2

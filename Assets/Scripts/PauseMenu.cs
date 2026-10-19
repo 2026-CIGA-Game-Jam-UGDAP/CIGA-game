@@ -18,6 +18,11 @@ public class PauseMenu : MonoBehaviour
     public Button btnQuit;
 
     bool isOpen;
+    float timeScaleBeforePause = 1f;
+    static PauseMenu openMenu;
+
+    public static bool IsOpen => openMenu != null && openMenu.isOpen;
+    internal static float ResumeTimeScale => openMenu != null ? openMenu.timeScaleBeforePause : Time.timeScale;
 
     void Awake()
     {
@@ -38,7 +43,11 @@ public class PauseMenu : MonoBehaviour
     public void Open()
     {
         if (isOpen) return;
+        timeScaleBeforePause = DialogueManager.IsActive ? DialogueManager.Instance.ResumeTimeScale : Time.timeScale;
         isOpen = true;
+        openMenu = this;
+        overlayGroup.DOKill();
+        menuBox.DOKill();
         gameObject.SetActive(true);
 
         overlayGroup.blocksRaycasts = true;
@@ -52,22 +61,45 @@ public class PauseMenu : MonoBehaviour
     public void Close()
     {
         if (!isOpen) return;
-        isOpen = false;
+        ReleaseTimePause();
+        overlayGroup.DOKill();
+        menuBox.DOKill();
 
         overlayGroup.blocksRaycasts = false;
         overlayGroup.DOFade(0f, 0.2f).SetUpdate(true);
 
         menuBox.DOScale(0f, 0.2f).SetEase(Ease.InBack).SetUpdate(true)
             .OnComplete(() => gameObject.SetActive(false));
+    }
 
-        Time.timeScale = 1f;
+    void ReleaseTimePause()
+    {
+        if (!isOpen) return;
+        isOpen = false;
+        if (openMenu != this) return;
+        openMenu = null;
+        if (!DialogueManager.IsActive)
+            Time.timeScale = timeScaleBeforePause;
+    }
+
+    void OnDisable()
+    {
+        ReleaseTimePause();
+    }
+
+    void PrepareSceneChange()
+    {
+        overlayGroup.DOKill();
+        menuBox.DOKill();
+        if (DialogueManager.Instance != null)
+            DialogueManager.Instance.CancelDialogue();
+        ReleaseTimePause();
+        gameObject.SetActive(false);
     }
 
     void Restart()
     {
-        Time.timeScale = 1f;
-        isOpen = false;
-        gameObject.SetActive(false);
+        PrepareSceneChange();
         var gm = FindFirstObjectByType<GameManager>();
         if (gm != null)
             gm.RestartGame();
@@ -75,7 +107,7 @@ public class PauseMenu : MonoBehaviour
 
     void GoToLobby()
     {
-        Time.timeScale = 1f;
+        PrepareSceneChange();
         SceneManager.LoadScene("Lobby");
     }
 

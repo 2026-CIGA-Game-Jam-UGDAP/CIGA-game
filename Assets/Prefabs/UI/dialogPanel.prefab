@@ -467,7 +467,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   typewriterStartsAutomatically: 0
   animationLoop: 0
-  timeScale: 0
+  timeScale: 1
   _text: 
   useDynamicScaling: 1
   referenceFontSize: 10

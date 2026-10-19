@@ -21,6 +21,10 @@ MonoBehaviour:
     text: "\u6211\u4E5F\u6CA1\u89C1\u8FC7\u5F00\u5173\u4E00\u4E2A\u5B89\u5728\u9876\u90E8\u4E00\u4E2A\u5B89\u5728\u5E95\u90E8\u7684\u8BBE\u8BA1\uFF0C\u6216\u8BB8\u6211\u4EEC\u4FE9\u9700\u8981\u540C\u65F6\u7AD9\u5728\u6807\u8BB0\u7684\u533A\u57DF\u2026\u2026"
     portrait: {fileID: 0}
     bigPortrait: {fileID: -391726316, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
+  - speakerName:
+    text: "请两位玩家分别站到飞船上、下两个出入口的标记区域。两人同时就位后，飞船会自动出发，进入下一关！"
+    portrait: {fileID: 0}
+    bigPortrait: {fileID: 0}
   useTypingEffect: 1
   useAnimation: 0
   needsCG: 0

@@ -4,6 +4,7 @@ using TMPro;
 using TMPro.EditorUtilities;
 using System.IO;
 using System.Collections.Generic;
+using System;
 
 /// <summary>
 /// SmileySans 字体生成工具。
@@ -21,6 +22,64 @@ public static class FontCreator
         "方波拉兹这是里被砸开的人类空间站我们的飞船不是彻底陨星撞碎成渣了嗯身边只剩条破绳子和你把那个铁疙瘩捡起来看看吸附在表面上试试移动得配合作行动燃料不多了去太空站外围找找有没有备用推进器够外面有能量泄漏补充一下不用要一小会就快满了看那边好像艘废弃的它还能飞吗能推动不过需要全部零件收集齐才启动反应堆好搜刮周边区域太棒了现在俩人可以同时对接启动引擎回家完美胜利尽管历经艰险最幸运的是有你梦想我们活下去了但星光照亮前路冒险还远未结束" +
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789" +
         "，。！？…—、：；\"\"''（）《》";
+
+    [MenuItem("Tools/补齐游戏文字字库")]
+    public static void BakeGameCharacters()
+    {
+        var font = AssetDatabase.LoadAssetAtPath<TMP_FontAsset>(SDF_PATH);
+        if (font == null || font.sourceFontFile == null || font.atlasTexture == null)
+            throw new InvalidOperationException("[FontCreator] SmileySans 字体或源字体缺失，无法补齐字库。");
+
+        var characters = new HashSet<char>();
+        for (char c = ' '; c <= '~'; c++) characters.Add(c);
+
+        foreach (string guid in AssetDatabase.FindAssets("t:DialogueSO", new[] { "Assets/data/Dialogues" }))
+        {
+            var dialogue = AssetDatabase.LoadAssetAtPath<DialogueSO>(AssetDatabase.GUIDToAssetPath(guid));
+            if (dialogue.lines == null) continue;
+            foreach (var line in dialogue.lines)
+            {
+                AddCharacters(characters, line.speakerName);
+                AddCharacters(characters, line.text);
+            }
+        }
+
+        foreach (string path in new[] { "Assets/Prefabs/UI/DialogueSystem.prefab", "Assets/Prefabs/UI/PartCollectionUI.prefab" })
+        {
+            var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
+            if (prefab == null) continue;
+            foreach (var text in prefab.GetComponentsInChildren<TMP_Text>(true))
+                AddCharacters(characters, text.text);
+        }
+        AddCharacters(characters, SurfaceSpeedBoost.PopupText);
+
+        var sorted = new List<char>(characters);
+        sorted.Sort();
+        font.atlasPopulationMode = AtlasPopulationMode.Dynamic;
+        font.isMultiAtlasTexturesEnabled = true;
+        bool complete = font.TryAddCharacters(new string(sorted.ToArray()), out string missingCharacters);
+
+        // 将所有图集和字形一同保存，构建时也保留，避免运行时才遇到缺字。
+        var serializedFont = new SerializedObject(font);
+        serializedFont.FindProperty("m_ClearDynamicDataOnBuild").boolValue = false;
+        serializedFont.ApplyModifiedPropertiesWithoutUndo();
+        foreach (var atlas in font.atlasTextures)
+            if (atlas != null) EditorUtility.SetDirty(atlas);
+        EditorUtility.SetDirty(font);
+        AssetDatabase.SaveAssets();
+
+        if (!complete)
+            throw new InvalidOperationException($"[FontCreator] 源字体不支持以下字符：{missingCharacters}");
+
+        Debug.Log($"[FontCreator] 已烘焙 {characters.Count} 个游戏字符，图集 {font.atlasTextureCount} 张，保留原字体 GUID 和引用。");
+    }
+
+    static void AddCharacters(HashSet<char> characters, string text)
+    {
+        if (string.IsNullOrEmpty(text)) return;
+        foreach (char c in TextSanitizer.SanitizeString(text))
+            if (!char.IsControl(c)) characters.Add(c);
+    }
 
     [MenuItem("Tools/准备生成SmileySans")]
     public static void PrepareFontGeneration()

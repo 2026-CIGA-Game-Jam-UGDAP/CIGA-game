@@ -1395,7 +1395,7 @@ MonoBehaviour:
   afterRechargeDialogue: {fileID: 0}
   afterRechargeGoToShipDialogue: {fileID: 0}
   afterReachShipDialogue: {fileID: 0}
-  afterCollectDialogue: {fileID: 0}
+  afterCollectDialogue: {fileID: 11400000, guid: 5e79853a7ce84f0e97b29bd046d091eb, type: 2}
   afterMeteorDialogue: {fileID: 0}
   endingDialogue: {fileID: 0}
   energyTutorialDialogue: {fileID: 0}

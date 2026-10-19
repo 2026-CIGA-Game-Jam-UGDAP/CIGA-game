@@ -14,7 +14,10 @@ public class DialogueManager : MonoBehaviour
     public static DialogueManager Instance { get; private set; }
 
     /// <summary>对话是否正在播放。其他脚本（如 PlayerController）读这个来禁用输入。</summary>
-    public static bool IsActive => Instance != null && Instance.dialoguePanel.activeSelf;
+    public static bool IsActive => Instance != null && Instance.dialoguePanel != null && Instance.dialoguePanel.activeSelf;
+
+    // 和暂停菜单共用同一个恢复倍率，任一界面仍打开时都保持暂停。
+    internal float ResumeTimeScale => timeScaleBeforeDialogue;
 
     [Header("角色配置")]
     [Tooltip("所有角色配置（从 CharacterConfig asset 拖入）")]
@@ -70,6 +73,8 @@ public class DialogueManager : MonoBehaviour
     DialogueSO currentDialogue;
     int currentLineIndex;
     bool lineFullyShown;
+    bool ownsTimePause;
+    float timeScaleBeforeDialogue = 1f;
     TMPro.TextAlignmentOptions defaultAlignment;
 
     void Awake()
@@ -84,18 +89,25 @@ public class DialogueManager : MonoBehaviour
         DontDestroyOnLoad(gameObject);
         dialoguePanel.SetActive(false);
         defaultAlignment = dialogueText.alignment;
+        if (textAnimator != null)
+            textAnimator.timeScale = Febucci.UI.TimeScale.Unscaled;
     }
 
     /// <summary>GameManager 或其他脚本调用，开始一段对话</summary>
     public void StartDialogue(DialogueSO dialogue)
     {
-        if (dialogue == null || dialogue.lines.Length == 0)
+        if (dialogue == null || dialogue.lines == null || dialogue.lines.Length == 0)
             return;
 
         currentDialogue = dialogue;
         currentLineIndex = 0;
 
         dialoguePanel.SetActive(true);
+        if (!ownsTimePause)
+        {
+            timeScaleBeforeDialogue = PauseMenu.IsOpen ? PauseMenu.ResumeTimeScale : Time.timeScale;
+            ownsTimePause = true;
+        }
         Time.timeScale = 0f;
 
         if (AudioManager.Instance != null)
@@ -106,7 +118,7 @@ public class DialogueManager : MonoBehaviour
 
     void Update()
     {
-        if (!IsActive) return;
+        if (!IsActive || PauseMenu.IsOpen) return;
 
         bool advancePressed = Input.GetKeyDown(PlayerController.DialogueAdvance);
 
@@ -167,9 +179,9 @@ public class DialogueManager : MonoBehaviour
         // 文本
         if (currentDialogue.useTypingEffect && typewriter != null)
         {
-            typewriter.ShowText(safeText);
             typewriter.onTextShowed.RemoveAllListeners();
             typewriter.onTextShowed.AddListener(() => OnTypingComplete());
+            typewriter.ShowText(safeText);
         }
         else
         {
@@ -276,6 +288,18 @@ public class DialogueManager : MonoBehaviour
     /// <summary>结束对话</summary>
     void EndDialogue()
     {
+        FinishDialogue(true);
+    }
+
+    /// <summary>重开/离开关卡时关闭对话，不触发完成事件。</summary>
+    internal void CancelDialogue()
+    {
+        if (currentDialogue != null || ownsTimePause)
+            FinishDialogue(false);
+    }
+
+    void FinishDialogue(bool invokeCompletion)
+    {
         if (typewriter != null && typewriter.isShowingText)
             typewriter.SkipTypewriter();
 
@@ -288,16 +312,28 @@ public class DialogueManager : MonoBehaviour
         if (bigPortraitGo != null) bigPortraitGo.SetActive(false);
         if (leftGroup != null) leftGroup.SetActive(false);
         if (rightGroup != null) rightGroup.SetActive(false);
+        if (bigPortrait != null) bigPortrait.DOKill();
+        if (leftPortrait != null) leftPortrait.DOKill();
+        if (rightPortrait != null) rightPortrait.DOKill();
         speakerNameText.gameObject.SetActive(true);
         dialogueText.alignment = defaultAlignment;
 
-        Time.timeScale = 1f;
+        ReleaseTimePause();
 
         allowActionKeyAdvance = false;
 
         var done = currentDialogue;
         currentDialogue = null;
-        done?.onComplete?.Invoke();
+        if (invokeCompletion)
+            done?.onComplete?.Invoke();
+    }
+
+    void ReleaseTimePause()
+    {
+        if (!ownsTimePause) return;
+        ownsTimePause = false;
+        if (!PauseMenu.IsOpen)
+            Time.timeScale = timeScaleBeforeDialogue;
     }
 
     /// <summary>从 CharacterConfig 查找角色站位，未找到默认右侧</summary>
@@ -315,9 +351,17 @@ public class DialogueManager : MonoBehaviour
         return speakerName == "方波";
     }
 
+    void OnDisable()
+    {
+        if (Instance == this)
+            CancelDialogue();
+    }
+
     void OnDestroy()
     {
-        if (IsActive)
-            Time.timeScale = 1f;
+        // 新场景中的重复单例被销毁时，不能解除旧单例持有的暂停。
+        if (Instance != this) return;
+        ReleaseTimePause();
+        Instance = null;
     }
 }

@@ -84,9 +84,9 @@ public class GameManager : MonoBehaviour
     public DialogueSO afterRechargeDialogue;
     [Tooltip("（关卡0）补充能量后，指引前往飞船的对话")]
     public DialogueSO afterRechargeGoToShipDialogue;
-    [Tooltip("（关卡0）两个玩家都到达飞船后播放的对话")]
+    [Tooltip("零件收齐后，任一玩家回到飞船时播放的双人对接引导（无零件的关卡直接在登船时播放）")]
     public DialogueSO afterReachShipDialogue;
-    [Tooltip("（关卡1+）收集完所有零件后播放的对话")]
+    [Tooltip("收集完所有零件后播放的回船引导")]
     public DialogueSO afterCollectDialogue;
     [Tooltip("陨石撞击后播放的对话")]
     public DialogueSO afterMeteorDialogue;
@@ -148,6 +148,9 @@ public class GameManager : MonoBehaviour
 
     /// <summary>全局单例，方便其他脚本调对话方法</summary>
     public static GameManager Instance { get; private set; }
+
+    /// <summary>收齐零件后显示飞船出入口引导，发船或重开时隐藏。</summary>
+    public bool ShouldShowDockGuides => collectedGoals >= totalGoalPickups && !shipAnimating && !hasWon && !resetting;
 
     void Start()
     {
@@ -224,6 +227,9 @@ public class GameManager : MonoBehaviour
         //     ResetLevel();
 
         CheckDialogueTriggers();
+
+        // 对话关闭后重新核对对接条件，已站好位置的玩家不需要退出再进入。
+        CheckShipCondition();
     }
 
     /// <summary>ShipDockTrigger 调用：玩家进入对接区</summary>
@@ -298,33 +304,29 @@ public class GameManager : MonoBehaviour
     /// <summary>检查飞船对接+零件收集条件</summary>
     void CheckShipCondition()
     {
-        if (shipAnimating)
-        {
-            Debug.Log("[Ship] shipAnimating=true，跳过检查");
-            return;
-        }
-        if (collectedGoals < totalGoalPickups)
-        {
-            Debug.Log($"[Ship] 零件不足: {collectedGoals}/{totalGoalPickups}");
-            return;
-        }
+        if (shipAnimating || hasWon || resetting || collectedGoals < totalGoalPickups) return;
 
         if (dockTrigger1 == null || dockTrigger2 == null)
         {
-            Debug.Log($"[Ship] dockTrigger 未全部赋值: 1={dockTrigger1 != null} 2={dockTrigger2 != null}");
             return;
         }
         if (!dockTrigger1.HasPlayer || !dockTrigger2.HasPlayer)
         {
-            Debug.Log($"[Ship] 玩家未全部 dock: 1={dockTrigger1.HasPlayer} 2={dockTrigger2.HasPlayer}");
             return;
         }
 
         // 两个 trigger 里必须是不同玩家
         if (dockTrigger1.DockedPlayer == dockTrigger2.DockedPlayer)
         {
-            Debug.Log("[Ship] 同一个玩家在两个 trigger 中，等待不同玩家");
             return;
+        }
+
+        // 最后一个零件被拾取时可能两人已经就位，仍需先完整显示本关引导。
+        if (DialogueManager.Instance != null)
+        {
+            if (!enterDialogueReady || DialogueManager.IsActive) return;
+            if (totalGoalPickups > 0 && afterCollectDialogue != null && !collectDialogueTriggered) return;
+            if (afterReachShipDialogue != null && !reachShipDialogueTriggered) return;
         }
 
         Debug.Log("[Ship] 条件满足，启动飞船动画！");
@@ -380,7 +382,7 @@ public class GameManager : MonoBehaviour
     /// <summary>每帧检查条件，触发对应对话（顺序链式触发）</summary>
     void CheckDialogueTriggers()
     {
-        if (DialogueManager.Instance == null || DialogueManager.IsActive) return;
+        if (shipAnimating || hasWon || DialogueManager.Instance == null || DialogueManager.IsActive) return;
         if (!enterDialogueReady) return;
 
         // 能量教程对话：独立于链，待触发时在当前对话空隙中弹出
@@ -474,20 +476,21 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 8. 到达飞船对话（关卡0）
-        if (goToShipDialogueTriggeredOrSkipped() && !reachShipDialogueTriggered &&
-            player1ReachedShip && player2ReachedShip && afterReachShipDialogue != null)
-        {
-            reachShipDialogueTriggered = true;
-            DialogueManager.Instance.StartDialogue(afterReachShipDialogue);
-            return;
-        }
-
-        // 9. 收集完零件对话（关卡1+：部分关卡没有关卡0流程，靠前置 trigger 已默认通过跳到这里）
+        // 8. 各关收齐零件后先提示回到飞船，无需收集的教学关不弹此提示。
         if (!collectDialogueTriggered && IsCollectConditionMet() && afterCollectDialogue != null)
         {
             collectDialogueTriggered = true;
             DialogueManager.Instance.StartDialogue(afterCollectDialogue);
+            return;
+        }
+
+        // 9. 回船后说明两个出入口的站位。读取当前吸附/对接状态，避免开局登船算作回船。
+        bool readyToDock = totalGoalPickups <= 0 ||
+            (collectedGoals >= totalGoalPickups && (afterCollectDialogue == null || collectDialogueTriggered));
+        if (readyToDock && !reachShipDialogueTriggered && afterReachShipDialogue != null && IsAnyPlayerOnShip())
+        {
+            reachShipDialogueTriggered = true;
+            DialogueManager.Instance.StartDialogue(afterReachShipDialogue);
             return;
         }
 
@@ -500,41 +503,23 @@ public class GameManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 检查是否满足收集完零件触发条件：
-    /// 对于有关卡0流程的关卡（rechargeDialogueTriggered=true），需要前置链走完；
-    /// 对于其他关卡，只需要 enterDialoguePlayed 即可（如果有关卡0字段没填则默认通过）。
+    /// 收齐零件即可提示回船；没有开场对话的关卡也能正常触发。
     /// </summary>
     bool IsCollectConditionMet()
     {
-        // 如果场景中根本没填 afterCollectDialogue，别触发
-        if (afterCollectDialogue == null) return false;
-
-        // 如果填了关卡0的对话字段，说明这是有关卡0教学链的关卡，需要链走完
-        bool hasLevel0Flow = afterDetachDialogue != null || afterRechargeDialogue != null;
-
-        if (hasLevel0Flow)
-        {
-            // 有关卡0链：需要 recharge 对话已触发（或跳过） + 零件全部收集
-            return (rechargeDialogueTriggered || rechargeDialogueTriggeredIfNoAsset()) &&
-                   collectedGoals >= totalGoalPickups;
-        }
-        else
-        {
-            // 没有关卡0链（如 Level1+）：enter 对话播完 + 零件全部收集
-            return enterDialoguePlayed && collectedGoals >= totalGoalPickups;
-        }
+        return totalGoalPickups > 0 && collectedGoals >= totalGoalPickups &&
+            (enterDialogue == null || enterDialoguePlayed);
     }
 
-    /// <summary>如果场景中没填 afterRechargeDialogue 资产，视为已触发</summary>
-    bool rechargeDialogueTriggeredIfNoAsset()
+    /// <summary>任一玩家当前吸附在飞船表面或已进入出入口，即视为登船。</summary>
+    bool IsAnyPlayerOnShip()
     {
-        return afterRechargeDialogue == null || rechargeDialogueTriggered;
-    }
+        if ((dockTrigger1 != null && dockTrigger1.HasPlayer) ||
+            (dockTrigger2 != null && dockTrigger2.HasPlayer)) return true;
 
-    /// <summary>如果场景中没填 afterRechargeGoToShipDialogue 资产，视为已触发</summary>
-    bool goToShipDialogueTriggeredOrSkipped()
-    {
-        return afterRechargeGoToShipDialogue == null || goToShipDialogueTriggered;
+        return shipAnchor != null &&
+            ((player1 != null && player1.IsAnchored && ReferenceEquals(player1.CurrentAnchor, shipAnchor)) ||
+             (player2 != null && player2.IsAnchored && ReferenceEquals(player2.CurrentAnchor, shipAnchor)));
     }
 
     /// <summary>PlayerController 调用：玩家解除了吸附</summary>

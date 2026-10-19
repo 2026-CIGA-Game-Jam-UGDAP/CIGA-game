@@ -8,6 +8,8 @@ using TMPro;
 /// </summary>
 public class SurfaceSpeedBoost : MonoBehaviour
 {
+    public const string PopupText = "移动速度UP！";
+
     [Header("加速量")]
     [Tooltip("拾取后给玩家 moveSpeed 加的值")]
     public float speedBonus = 3f;
@@ -15,6 +17,8 @@ public class SurfaceSpeedBoost : MonoBehaviour
     public float maxSpeedCap = 6f;
 
     [Header("浮字提示")]
+    [Tooltip("支持中文的 TMP 字体")]
+    public TMP_FontAsset popupFont;
     [Tooltip("飘字初始颜色")]
     public Color popupColor = Color.yellow;
     [Tooltip("飘字字号")]
@@ -46,7 +50,8 @@ public class SurfaceSpeedBoost : MonoBehaviour
         popup.transform.position = playerTransform.position + Vector3.up * 2f;
 
         TextMeshPro tmp = popup.AddComponent<TextMeshPro>();
-        tmp.text = "Speed ++！";
+        tmp.font = popupFont;
+        tmp.text = PopupText;
         tmp.fontSize = popupFontSize;
         tmp.color = popupColor;
         tmp.alignment = TextAlignmentOptions.Center;
