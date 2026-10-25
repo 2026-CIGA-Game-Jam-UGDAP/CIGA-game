@@ -214,11 +214,13 @@ public class GameManager : MonoBehaviour
         // ESC 暂停菜单
         if (Input.GetKeyDown(KeyCode.Escape) && pauseMenu != null)
         {
-            if (pauseMenu.gameObject.activeSelf)
+            if (PauseMenu.IsOpen)
                 pauseMenu.Close();
             else
                 pauseMenu.Open();
         }
+
+        if (PauseMenu.IsOpen) return;
 
         // ★ 暂时取消掉落死亡
         // if (player1 != null && player1.transform.position.y < deathY)
@@ -297,13 +299,14 @@ public class GameManager : MonoBehaviour
     IEnumerator DoRestart()
     {
         // 等帧末退出 UI 事件上下文，让 Obi 自然销毁
-        yield return new WaitForEndOfFrame();
+        yield return null;
         SceneManager.LoadScene(SceneManager.GetActiveScene().name);
     }
 
     /// <summary>检查飞船对接+零件收集条件</summary>
     void CheckShipCondition()
     {
+        if (PauseMenu.IsOpen) return;
         if (shipAnimating || hasWon || resetting || collectedGoals < totalGoalPickups) return;
 
         if (dockTrigger1 == null || dockTrigger2 == null)
@@ -339,7 +342,13 @@ public class GameManager : MonoBehaviour
 
         // 触发飞船动画
         if (shipAnimator != null)
+        {
+            var progressLights = shipAnimator.GetComponent<ShipProgressLights>();
+            if (progressLights != null)
+                progressLights.CompleteLevel();
+
             shipAnimator.SetTrigger(shipAnimTrigger);
+        }
 
         // 等动画播完
         yield return new WaitForSeconds(shipAnimDuration);

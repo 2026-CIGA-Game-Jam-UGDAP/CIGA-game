@@ -135,7 +135,7 @@ public class PlayerController : MonoBehaviour
     void Update()
     {
         // 初始化/对话中禁用所有输入
-        if (GameManager.IsInitializing || DialogueManager.IsActive) return;
+        if (GameManager.IsInitializing || DialogueManager.IsActive || PauseMenu.IsOpen) return;
 
         // ★ 持续喷气：FixedUpdate 中直接读取 GetKey，这里不需要额外处理
 
@@ -186,6 +186,12 @@ public class PlayerController : MonoBehaviour
                 AudioManager.Instance.StopThruster(transform);
         }
         wasJetting = freeJetting;
+    }
+
+    void OnDisable()
+    {
+        AudioManager.Instance?.StopThruster(transform);
+        wasJetting = false;
     }
 
     void FixedUpdate()

@@ -91,6 +91,11 @@ public class DialogueManager : MonoBehaviour
         defaultAlignment = dialogueText.alignment;
         if (textAnimator != null)
             textAnimator.timeScale = Febucci.UI.TimeScale.Unscaled;
+        if (typewriter != null)
+        {
+            typewriter.onTextShowed.AddListener(OnTypingComplete);
+            typewriter.onCharacterVisible.AddListener(OnCharacterVisible);
+        }
     }
 
     /// <summary>GameManager 或其他脚本调用，开始一段对话</summary>
@@ -109,9 +114,6 @@ public class DialogueManager : MonoBehaviour
             ownsTimePause = true;
         }
         Time.timeScale = 0f;
-
-        if (AudioManager.Instance != null)
-            AudioManager.Instance.PlayDialogueTyping();
 
         ShowLine(currentDialogue.lines[0]);
     }
@@ -141,6 +143,7 @@ public class DialogueManager : MonoBehaviour
     void ShowLine(DialogueLine line)
     {
         lineFullyShown = false;
+        AudioManager.Instance?.StopDialogueTyping();
 
         // ★ 消毒文本：替换字体可能不支持的字符，防止乱码
         string safeText = TextSanitizer.SanitizeString(line.text);
@@ -179,9 +182,8 @@ public class DialogueManager : MonoBehaviour
         // 文本
         if (currentDialogue.useTypingEffect && typewriter != null)
         {
-            typewriter.onTextShowed.RemoveAllListeners();
-            typewriter.onTextShowed.AddListener(() => OnTypingComplete());
             typewriter.ShowText(safeText);
+            if (PauseMenu.IsOpen) typewriter.StopShowingText();
         }
         else
         {
@@ -257,6 +259,20 @@ public class DialogueManager : MonoBehaviour
     {
         lineFullyShown = true;
         pressHint.SetActive(true);
+        AudioManager.Instance?.StopDialogueTyping();
+    }
+
+    void OnCharacterVisible(char character)
+    {
+        if (lineFullyShown || PauseMenu.IsOpen || char.IsWhiteSpace(character) || char.IsPunctuation(character)) return;
+        AudioManager.Instance?.PlayDialogueTyping();
+    }
+
+    internal void SetMenuPaused(bool paused)
+    {
+        if (!IsActive || lineFullyShown || typewriter == null) return;
+        if (paused) typewriter.StopShowingText();
+        else typewriter.StartShowingText();
     }
 
     /// <summary>跳过当前打字机，立刻显示完整文本</summary>
@@ -361,6 +377,11 @@ public class DialogueManager : MonoBehaviour
     {
         // 新场景中的重复单例被销毁时，不能解除旧单例持有的暂停。
         if (Instance != this) return;
+        if (typewriter != null)
+        {
+            typewriter.onTextShowed.RemoveListener(OnTypingComplete);
+            typewriter.onCharacterVisible.RemoveListener(OnCharacterVisible);
+        }
         ReleaseTimePause();
         Instance = null;
     }

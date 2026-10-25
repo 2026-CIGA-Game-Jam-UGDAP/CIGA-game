@@ -35,6 +35,15 @@ public class AudioManager : MonoBehaviour
 
     [Header("音量")]
     [Range(0f, 2f)] public float bgmVolume = 1.5f;
+    [Tooltip("对话打字音相对其他音效的音量")]
+    [Range(0f, 1f)] public float dialogueTypingVolume = 0.18f;
+
+    const string MusicVolumeKey = "Audio.MusicVolume";
+    const string SfxVolumeKey = "Audio.SfxVolume";
+    public float MusicVolume { get; private set; }
+    public float SfxVolume { get; private set; }
+    float currentBgmGain;
+    bool gameplayPaused;
 
     // ---- 内部 ----
     AudioSource uiSource;
@@ -45,6 +54,7 @@ public class AudioManager : MonoBehaviour
 
     // ---- 推进器跟踪 ----
     Dictionary<Transform, AudioSource> thrusterSources = new Dictionary<Transform, AudioSource>();
+    Dictionary<Transform, float> thrusterBaseVolumes = new Dictionary<Transform, float>();
 
     void Awake()
     {
@@ -56,6 +66,9 @@ public class AudioManager : MonoBehaviour
 
         Instance = this;
         DontDestroyOnLoad(gameObject);
+        MusicVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(MusicVolumeKey, 0.55f));
+        SfxVolume = Mathf.Clamp01(PlayerPrefs.GetFloat(SfxVolumeKey, 0.65f));
+        currentBgmGain = Mathf.Clamp01(bgmVolume);
 
         // 2D 音源（UI SFX）：挂在自身
         uiSource = gameObject.AddComponent<AudioSource>();
@@ -67,7 +80,7 @@ public class AudioManager : MonoBehaviour
         bgmSource.spatialBlend = 0f;
         bgmSource.loop = true;
         bgmSource.playOnAwake = false;
-        bgmSource.volume = bgmVolume;
+        bgmSource.volume = Mathf.Clamp01(currentBgmGain * MusicVolume);
 
         // 2D 音源（对话）：挂在自身，不叠加、可打断，非循环
         dialogueSource = gameObject.AddComponent<AudioSource>();
@@ -88,31 +101,88 @@ public class AudioManager : MonoBehaviour
             src.maxDistance = 30f;
             pool3D[i] = src;
         }
+        ApplySfxVolume();
+    }
+
+    public void SetMusicVolume(float volume)
+    {
+        MusicVolume = Mathf.Clamp01(volume);
+        PlayerPrefs.SetFloat(MusicVolumeKey, MusicVolume);
+        bgmSource.volume = Mathf.Clamp01(currentBgmGain * MusicVolume);
+    }
+
+    public void SetSfxVolume(float volume)
+    {
+        SfxVolume = Mathf.Clamp01(volume);
+        PlayerPrefs.SetFloat(SfxVolumeKey, SfxVolume);
+        ApplySfxVolume();
+    }
+
+    void ApplySfxVolume()
+    {
+        uiSource.volume = SfxVolume;
+        dialogueSource.volume = SfxVolume * dialogueTypingVolume;
+        foreach (var source in pool3D)
+            source.volume = SfxVolume;
+        foreach (var entry in thrusterSources)
+            if (entry.Value != null)
+                entry.Value.volume = thrusterBaseVolumes[entry.Key] * SfxVolume;
+    }
+
+    // 暂停游戏音效，保留 BGM，方便在设置里即时试听音乐音量。
+    public void SetGameplayPaused(bool paused)
+    {
+        gameplayPaused = paused;
+        SetSourcePaused(uiSource, paused);
+        SetSourcePaused(dialogueSource, paused);
+        foreach (var source in pool3D)
+            SetSourcePaused(source, paused);
+        foreach (var source in thrusterSources.Values)
+            SetSourcePaused(source, paused);
+    }
+
+    static void SetSourcePaused(AudioSource source, bool paused)
+    {
+        if (source == null) return;
+        if (paused) source.Pause();
+        else source.UnPause();
+    }
+
+    void OnApplicationPause(bool paused)
+    {
+        if (paused) PlayerPrefs.Save();
+    }
+
+    void OnApplicationQuit() => PlayerPrefs.Save();
+
+    void OnDestroy()
+    {
+        if (Instance == this) Instance = null;
     }
 
     // ==================== 2D One-Shot ====================
 
     public void PlaySceneTransition()
     {
-        if (sceneTransitionClip != null)
+        if (!gameplayPaused && sceneTransitionClip != null)
             uiSource.PlayOneShot(sceneTransitionClip);
     }
 
     public void PlayEnergyPickup()
     {
-        if (energyPickupClip != null)
+        if (!gameplayPaused && energyPickupClip != null)
             uiSource.PlayOneShot(energyPickupClip);
     }
 
     public void PlayPartPickup()
     {
-        if (partPickupClip != null)
+        if (!gameplayPaused && partPickupClip != null)
             uiSource.PlayOneShot(partPickupClip);
     }
 
     public void PlayAllCollected()
     {
-        if (allCollectedClip != null)
+        if (!gameplayPaused && allCollectedClip != null)
             uiSource.PlayOneShot(allCollectedClip);
     }
 
@@ -145,7 +215,7 @@ public class AudioManager : MonoBehaviour
 
     void Play3DOneShot(AudioClip clip, Vector3 worldPos)
     {
-        if (clip == null) return;
+        if (clip == null || gameplayPaused || pool3D.Length == 0) return;
 
         AudioSource src = pool3D[poolIndex];
         src.transform.position = worldPos;
@@ -159,7 +229,7 @@ public class AudioManager : MonoBehaviour
     /// <summary>开始推进器循环音效。传入玩家 Transform 和该玩家身上的 AudioSource</summary>
     public void StartThruster(Transform player, AudioSource source)
     {
-        if (thrusterLoopClip == null || source == null) return;
+        if (thrusterLoopClip == null || source == null || gameplayPaused) return;
 
         // 避免重复启动
         if (thrusterSources.ContainsKey(player)) return;
@@ -167,6 +237,8 @@ public class AudioManager : MonoBehaviour
         source.clip = thrusterLoopClip;
         source.loop = true;
         source.spatialBlend = 1f;
+        thrusterBaseVolumes[player] = source.volume;
+        source.volume *= SfxVolume;
         source.Play();
         thrusterSources[player] = source;
     }
@@ -176,9 +248,14 @@ public class AudioManager : MonoBehaviour
     {
         if (!thrusterSources.TryGetValue(player, out AudioSource src)) return;
 
-        src.Stop();
-        src.clip = null;
+        if (src != null)
+        {
+            src.Stop();
+            src.clip = null;
+            src.volume = thrusterBaseVolumes[player];
+        }
         thrusterSources.Remove(player);
+        thrusterBaseVolumes.Remove(player);
     }
 
     // ==================== BGM ====================
@@ -192,11 +269,14 @@ public class AudioManager : MonoBehaviour
             return;
         }
 
-        // 同一个 clip 不重复触发
+        // 旧场景存在 1.5 的增益，AudioSource 原本也会把它限制到 1。
+        // 先限制场景增益再乘用户音量，确保滑杆整个区间都有效。
+        currentBgmGain = Mathf.Clamp01(volume >= 0f ? volume : bgmVolume);
+        bgmSource.volume = Mathf.Clamp01(currentBgmGain * MusicVolume);
+        // 同一个 clip 更新音量，但不重新播放
         if (bgmSource.clip == clip && bgmSource.isPlaying) return;
 
         bgmSource.clip = clip;
-        bgmSource.volume = volume > 0f ? volume : bgmVolume;
         bgmSource.Play();
     }
 
@@ -209,10 +289,10 @@ public class AudioManager : MonoBehaviour
 
     // ==================== 对话音效 ====================
 
-    /// <summary>开始对话音效（循环）。重复调用不会叠加，同一个 source 直接重播。</summary>
+    /// <summary>由可见字符触发打字音；同一音源不叠加，短音结束后后续字符可再次触发。</summary>
     public void PlayDialogueTyping()
     {
-        if (dialogueTypingClip == null) return;
+        if (dialogueTypingClip == null || gameplayPaused) return;
         if (dialogueSource.isPlaying) return; // 不叠加
         dialogueSource.clip = dialogueTypingClip;
         dialogueSource.Play();
