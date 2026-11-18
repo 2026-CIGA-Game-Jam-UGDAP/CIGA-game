@@ -33,10 +33,6 @@ MonoBehaviour:
     text: "\u8D77\u7801\u8FD9\u6837\u4E0D\u4F1A\u51FA\u73B0\u5F00\u4E00\u534A\u6CA1\u6CB9\u7684\u60C5\u51B5\u2026\u2026\u4F46\u4E5F\u5F97\u5BFB\u627E\u8865\u5145\u80FD\u91CF\u7684\u65B9\u6CD5\u3002"
     portrait: {fileID: 0}
     bigPortrait: {fileID: -1828046989, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
-  - speakerName: "\u65B9\u6CE2"
-    text: "\u5F80\u524D\u597D\u50CF\u6709\u51FA\u53E3\uFF0C\u6211\u4EEC\u5148\u98DE\u51FA\u53BB\u770B\u770B\u5427\u3002"
-    portrait: {fileID: 0}
-    bigPortrait: {fileID: -1828046989, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
   useTypingEffect: 1
   useAnimation: 0
   needsCG: 0

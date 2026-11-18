@@ -34,11 +34,11 @@ MonoBehaviour:
     portrait: {fileID: 0}
     bigPortrait: {fileID: -391726316, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
   - speakerName: "\u65B9\u6CE2"
-    text: "\u5509\u2026\u2026\u4E0D\u8FC7\uFF0C\u8D77\u7801\u6211\u4EEC\u7EC8\u4E8E\u4E0D\u7528\u98D8\u7740\uFF0C\u80FD\u5728\u8FD9\u7A7A\u95F4\u7AD9\u5148\u6B47\u6B47\u811A\uFF0C\u518D\u60F3\u4E0B\u4E00\u6B65\u2026\u2026"
+    text: "\u5509\u2026\u4E0D\u8FC7\uFF0C\u8D77\u7801\u6211\u4EEC\u7EC8\u4E8E\u4E0D\u7528\u98D8\u7740\uFF0C\u80FD\u5728\u8FD9\u7A7A\u95F4\u7AD9\u5148\u6B47\u6B47\u811A\uFF0C\u518D\u60F3\u4E0B\u4E00\u6B65\u2026\u2026"
     portrait: {fileID: 0}
     bigPortrait: {fileID: -1828046989, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
   - speakerName: "\u62C9\u5179"
-    text: "\u5443\u2026\u2026\u63D0\u9192\u4F60\u4E00\u4E0B\uFF0C\u6BD4\u8D77\u8BF4\u662F\u6211\u4EEC\"\u627E\u5230\"\u5B83\uFF0C\u66F4\u50CF\u662F\u5B83\"\u627E\u5230\"\u6211\u4EEC\u3002"
+    text: "\u63D0\u9192\u4F60\u4E00\u4E0B\uFF0C\u6BD4\u8D77\u8BF4\u662F\u6211\u4EEC\u201C\u627E\u5230\u201D\u5B83\uFF0C\u66F4\u50CF\u662F\u5B83\u201C\u627E\u5230\u201D\u6211\u4EEC\u3002"
     portrait: {fileID: 0}
     bigPortrait: {fileID: -391726316, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
   - speakerName: "\u62C9\u5179"
@@ -53,7 +53,7 @@ MonoBehaviour:
     text: "\u7136\u540E\uFF0C\u5982\u679C\u60F3\u89E3\u9664\u5438\u9644\u7684\u8BDD\uFF0C\u53EA\u9700\u8981\u2026\u2026"
     portrait: {fileID: 0}
     bigPortrait: {fileID: -1828046989, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
-  - speakerName: 
+  - speakerName:
     text: "\u6309\u4F4F\u3010Lshift/Enter\u3011\u8131\u79BB\u5BF9\u7A7A\u95F4\u7AD9\u7684\u5438\u9644\uFF01"
     portrait: {fileID: 0}
     bigPortrait: {fileID: 0}

@@ -1120,6 +1120,8 @@ MonoBehaviour:
   btnQuit: {fileID: 1533231381}
   fadeImage: {fileID: 506156430}
   fadeDuration: 0.3
+  openingVideo: {fileID: 1365772104}
+  openingDialogue: {fileID: 11400000, guid: 5fb85edacfa14994589d6a94e95409f0, type: 2}
 --- !u!1 &2049135138
 GameObject:
   m_ObjectHideFlags: 0
@@ -1190,6 +1192,51 @@ MonoBehaviour:
   playerCollisionClip: {fileID: 8300000, guid: 5e6de14c6f19a1145a352e97fc3d9e6e, type: 3}
   poolSize: 6
   bgmVolume: 1
+--- !u!1001 &1365772103
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 2539581114758153794, guid: fcfa5380dead7fa4e8d14515121d9f37, type: 3}
+      propertyPath: m_VideoClip
+      value:
+      objectReference: {fileID: 32900000, guid: 386d838eef3f45245b4801c7ad8d4840, type: 3}
+    - target: {fileID: 2640859546152549564, guid: fcfa5380dead7fa4e8d14515121d9f37, type: 3}
+      propertyPath: m_Name
+      value: OpeningVideo
+      objectReference: {fileID: 0}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: fcfa5380dead7fa4e8d14515121d9f37, type: 3}
+--- !u!114 &1365772104 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9217155694905211478, guid: fcfa5380dead7fa4e8d14515121d9f37, type: 3}
+  m_PrefabInstance: {fileID: 1365772103}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f83dff35b53a0b4eb04661f115dc569, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+--- !u!1001 &1921717726
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications: []
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: 05006f6f4ac93fb44b33d7956ab1bb0d, type: 3}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -1200,3 +1247,5 @@ SceneRoots:
   - {fileID: 2049135139}
   - {fileID: 1505669456}
   - {fileID: 920913425}
+  - {fileID: 1365772103}
+  - {fileID: 1921717726}

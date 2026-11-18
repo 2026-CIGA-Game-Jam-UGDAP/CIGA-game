@@ -71,6 +71,7 @@ public class DialogueManager : MonoBehaviour
 
     // 内部状态
     DialogueSO currentDialogue;
+    System.Action dialogueCompleted;
     int currentLineIndex;
     bool lineFullyShown;
     bool ownsTimePause;
@@ -101,9 +102,18 @@ public class DialogueManager : MonoBehaviour
     /// <summary>GameManager 或其他脚本调用，开始一段对话</summary>
     public void StartDialogue(DialogueSO dialogue)
     {
-        if (dialogue == null || dialogue.lines == null || dialogue.lines.Length == 0)
-            return;
+        StartDialogue(dialogue, null);
+    }
 
+    internal void StartDialogue(DialogueSO dialogue, System.Action onComplete)
+    {
+        if (dialogue == null || dialogue.lines == null || dialogue.lines.Length == 0)
+        {
+            onComplete?.Invoke();
+            return;
+        }
+
+        dialogueCompleted = onComplete;
         currentDialogue = dialogue;
         currentLineIndex = 0;
 
@@ -339,9 +349,14 @@ public class DialogueManager : MonoBehaviour
         allowActionKeyAdvance = false;
 
         var done = currentDialogue;
+        var onComplete = dialogueCompleted;
         currentDialogue = null;
+        dialogueCompleted = null;
         if (invokeCompletion)
+        {
             done?.onComplete?.Invoke();
+            onComplete?.Invoke();
+        }
     }
 
     void ReleaseTimePause()

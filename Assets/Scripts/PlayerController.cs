@@ -107,6 +107,7 @@ public class PlayerController : MonoBehaviour
     float surfaceT;           // 玩家在表面上的当前距离（沿周长，圆和多边形统一）
     float smoothedAngle;      // 平滑后的当前旋转角度（度），用于 LerpAngle
     bool wasJetting;          // 上一帧是否喷气，用于检测推进器音效 Start/Stop
+    bool hasUsedJetpack;
 
     // ---- 生命周期 ----
 
@@ -270,6 +271,11 @@ public class PlayerController : MonoBehaviour
 
         if (jetting)
         {
+            if (!hasUsedJetpack)
+            {
+                hasUsedJetpack = true;
+                GameManager.Instance?.OnPlayerJetpacked();
+            }
             float drain = jetEnergyDrainRate * Time.fixedDeltaTime;
             currentEnergy -= drain;
             if (currentEnergy < 0f) currentEnergy = 0f;
@@ -390,6 +396,7 @@ public class PlayerController : MonoBehaviour
             }
         }
 
+        if (isAnchored) GameManager.Instance?.OnPlayerDetached(playerIndex);
         isAnchored = false;
         anchoredAt = null;
         polyAnchoredAt = null;
@@ -511,6 +518,7 @@ public class PlayerController : MonoBehaviour
 
         isFlyingToAnchor = false;
         isAnchored = true;
+        GameManager.Instance?.OnPlayerAttached(playerIndex, anchor);
 
         Debug.Log($"[PlayerController] Player{playerIndex} 吸附完成(AnchorPoint): anchor={anchor.name}, surfaceT={surfaceT}");
 
@@ -593,6 +601,7 @@ public class PlayerController : MonoBehaviour
 
         isFlyingToAnchor = false;
         isAnchored = true;
+        GameManager.Instance?.OnPlayerAttached(playerIndex, anchor);
 
         Debug.Log($"[PlayerController] Player{playerIndex} 吸附完成(PolyAnchorPoint): anchor={anchor.name}, surfaceT={surfaceT}");
 

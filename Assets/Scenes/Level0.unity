@@ -2506,16 +2506,20 @@ MonoBehaviour:
   shipAnimTrigger: Play
   shipAnimDuration: 2
   nextSceneName: Level1
+  loadingVideo: {fileID: 1365772104}
+  advanceAfterEnterDialogue: 0
   pauseMenu: {fileID: 1953489733}
   enterDialogue: {fileID: 11400000, guid: 0caf7eb80da931b4db0345227220760e, type: 2}
   afterDetachDialogue: {fileID: 11400000, guid: d104c02c132e30d4ea31f58ac1f57437, type: 2}
   afterAttachDialogue: {fileID: 11400000, guid: 12ae1f4608eabe94dae7b068ab204ca6, type: 2}
-  afterDetach2Dialogue: {fileID: 11400000, guid: f0ff6db37928a9441b0de06249f991fd, type: 2}
   afterJetpackDialogue: {fileID: 11400000, guid: bdf852555518f904c81488119ae5057b, type: 2}
   afterExitDialogue: {fileID: 11400000, guid: f867185a386a4b646a1c8fb74a8fa801, type: 2}
-  approachDockDialogue: {fileID: 11400000, guid: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6, type: 2}
+  approachDockDialogue: {fileID: 0}
   afterRechargeDialogue: {fileID: 11400000, guid: fcca381639be6a145b97e424395875a3, type: 2}
   afterRechargeGoToShipDialogue: {fileID: 11400000, guid: 1701220ebdcc1dc42a870c5cc16e308d, type: 2}
+  tutorialPlatformRightX: 12
+  tutorialFirstPlanet: {fileID: 927768737}
+  tutorialCamera: {fileID: 568031475}
   afterReachShipDialogue: {fileID: 11400000, guid: a722a24dfe5d4414586d0d7023272d4b, type: 2}
   afterCollectDialogue: {fileID: 0}
   afterMeteorDialogue: {fileID: 0}
@@ -3600,6 +3604,41 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8040254289305511029, guid: f38c882624c53ee40afe357daeb7dfca, type: 3}
   m_PrefabInstance: {fileID: 1600000000}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &927768737 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 631944917701743352, guid: e7ead590770f3d04da161f60f4e851fb, type: 3}
+  m_PrefabInstance: {fileID: 927768735}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 30cbfb57ddc729543930c317adea9e5b, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+--- !u!1001 &1365772103
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications: []
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: fcfa5380dead7fa4e8d14515121d9f37, type: 3}
+--- !u!114 &1365772104 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9217155694905211478, guid: fcfa5380dead7fa4e8d14515121d9f37, type: 3}
+  m_PrefabInstance: {fileID: 1365772103}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f83dff35b53a0b4eb04661f115dc569, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -3631,3 +3670,4 @@ SceneRoots:
   - {fileID: 1272093444}
   - {fileID: 1013242806}
   - {fileID: 563663863}
+  - {fileID: 1365772103}

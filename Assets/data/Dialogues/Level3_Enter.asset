@@ -21,6 +21,10 @@ MonoBehaviour:
     text: "\u54EA\u91CC\uFF1F\u6211\u6CA1\u770B\u5230\u2014\u2014"
     portrait: {fileID: 0}
     bigPortrait: {fileID: -1828046989, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
+  - speakerName: "\u62C9\u5179"
+    text: "\u5C0F\u5FC3\u4E3A\u4E0A\uFF0C\u907F\u7740\u8D70\u5427\u3002"
+    portrait: {fileID: 0}
+    bigPortrait: {fileID: -391726316, guid: dcb5a4ef03042bf408b1c650d671b958, type: 3}
   useTypingEffect: 1
   useAnimation: 0
   needsCG: 0

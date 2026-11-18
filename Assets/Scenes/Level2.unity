@@ -1384,16 +1384,20 @@ MonoBehaviour:
   shipAnimTrigger: Play
   shipAnimDuration: 2
   nextSceneName: Level3
+  loadingVideo: {fileID: 1178388728}
+  advanceAfterEnterDialogue: 0
   pauseMenu: {fileID: 419238709}
   enterDialogue: {fileID: 11400000, guid: 01520865e907c1647b4fed3204b073a3, type: 2}
   afterDetachDialogue: {fileID: 0}
   afterAttachDialogue: {fileID: 0}
-  afterDetach2Dialogue: {fileID: 0}
   afterJetpackDialogue: {fileID: 0}
   afterExitDialogue: {fileID: 0}
   approachDockDialogue: {fileID: 0}
   afterRechargeDialogue: {fileID: 0}
   afterRechargeGoToShipDialogue: {fileID: 0}
+  tutorialPlatformRightX: 0
+  tutorialFirstPlanet: {fileID: 0}
+  tutorialCamera: {fileID: 0}
   afterReachShipDialogue: {fileID: 0}
   afterCollectDialogue: {fileID: 11400000, guid: 5e79853a7ce84f0e97b29bd046d091eb, type: 2}
   afterMeteorDialogue: {fileID: 0}
@@ -3518,6 +3522,30 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 8040254289305511029, guid: f38c882624c53ee40afe357daeb7dfca, type: 3}
   m_PrefabInstance: {fileID: 1600000000}
   m_PrefabAsset: {fileID: 0}
+--- !u!1001 &1178388727
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications: []
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents: []
+  m_SourcePrefab: {fileID: 100100000, guid: fcfa5380dead7fa4e8d14515121d9f37, type: 3}
+--- !u!114 &1178388728 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 9217155694905211478, guid: fcfa5380dead7fa4e8d14515121d9f37, type: 3}
+  m_PrefabInstance: {fileID: 1178388727}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5f83dff35b53a0b4eb04661f115dc569, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -3552,3 +3580,4 @@ SceneRoots:
   - {fileID: 1669486096}
   - {fileID: 1119695079}
   - {fileID: 28560513}
+  - {fileID: 1178388727}

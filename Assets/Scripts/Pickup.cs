@@ -29,6 +29,7 @@ public class Pickup : MonoBehaviour
         if (pickupType == Type.Energy)
         {
             pc.AddEnergy(energyAmount);
+            GameManager.Instance?.OnEnergyPickup();
             if (AudioManager.Instance != null)
                 AudioManager.Instance.PlayEnergyPickup();
         }
