@@ -1,6 +1,6 @@
 using UnityEngine;
 
-/// <summary>复用船身三个圆点，显示正式关卡的累计通关进度。</summary>
+/// <summary>显示船身通关进度灯和当前关的零件收集表情。</summary>
 [DisallowMultipleComponent]
 [RequireComponent(typeof(SpriteRenderer))]
 public class ShipProgressLights : MonoBehaviour
@@ -10,13 +10,18 @@ public class ShipProgressLights : MonoBehaviour
     [SerializeField] Transform lightsRoot;
     [Tooltip("从左到右排列的三个灯，包含各自的柔光子物体")]
     [SerializeField] GameObject[] lights;
+    [SerializeField] SpriteRenderer partFace;
+    [SerializeField] Sprite completedFace;
 
     SpriteRenderer shipRenderer;
+    Sprite incompleteFace;
     Sprite lastSprite;
 
     void Awake()
     {
         shipRenderer = GetComponent<SpriteRenderer>();
+        if (partFace != null)
+            incompleteFace = partFace.sprite;
 
         // 线性关卡按当前关序恢复；重开本关不累加，重新进入教学关自然清零。
         SetCompletedLevels(GetLevelNumber() - 1);
@@ -26,6 +31,13 @@ public class ShipProgressLights : MonoBehaviour
     public void CompleteLevel()
     {
         SetCompletedLevels(GetLevelNumber());
+    }
+
+    public void SetPartsCollected(bool complete)
+    {
+        if (partFace == null) return;
+        partFace.enabled = true;
+        partFace.sprite = complete && completedFace != null ? completedFace : incompleteFace;
     }
 
     void SetCompletedLevels(int completedLevels)

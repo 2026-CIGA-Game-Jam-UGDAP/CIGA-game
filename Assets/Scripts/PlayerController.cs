@@ -102,6 +102,7 @@ public class PlayerController : MonoBehaviour
     Animator animator;
     bool isAnchored;
     bool isFlyingToAnchor;
+    bool hasSurfaceSpeedBoost;
     AnchorPoint anchoredAt;
     PolyAnchorPoint polyAnchoredAt;
     float surfaceT;           // 玩家在表面上的当前距离（沿周长，圆和多边形统一）
@@ -131,6 +132,15 @@ public class PlayerController : MonoBehaviour
         currentEnergy = maxEnergy;
 
         spawnBounce?.Play();
+    }
+
+    public bool TryApplySurfaceSpeedBoost(float bonus, float speedCap)
+    {
+        if (hasSurfaceSpeedBoost) return false;
+
+        hasSurfaceSpeedBoost = true;
+        moveSpeed = Mathf.Max(moveSpeed, Mathf.Min(moveSpeed + bonus, speedCap));
+        return true;
     }
 
     void Update()
@@ -421,7 +431,7 @@ public class PlayerController : MonoBehaviour
     // ---- 表面接口分发（AnchorPoint 和 PolyAnchorPoint 方法名一致，手动分发） ----
     float AnchorSurfaceLength => polyAnchoredAt != null ? polyAnchoredAt.SurfaceLength : (anchoredAt != null ? anchoredAt.SurfaceLength : 0f);
     float AnchorMoveSign => polyAnchoredAt != null ? polyAnchoredAt.MoveDirectionSign : (anchoredAt != null ? anchoredAt.MoveDirectionSign : -1f);
-    Vector2 AnchorSurfacePoint(float t) => polyAnchoredAt != null ? polyAnchoredAt.GetSurfacePoint(t) : anchoredAt.GetSurfacePoint(t);
+    Vector2 AnchorSurfacePoint(float t) => polyAnchoredAt != null ? polyAnchoredAt.GetSurfacePoint(t) : anchoredAt.GetPhysicsSurfacePoint(t);
     Vector2 AnchorSurfaceNormal(float t) => polyAnchoredAt != null ? polyAnchoredAt.GetSurfaceNormal(t) : anchoredAt.GetSurfaceNormal(t);
     float AnchorClosestT(Vector3 pos) => polyAnchoredAt != null ? polyAnchoredAt.FindClosestSurfaceT(pos) : anchoredAt.FindClosestSurfaceT(pos);
     Vector2 AnchorClosestPoint(Vector3 pos) => polyAnchoredAt != null ? polyAnchoredAt.GetClosestSurfacePoint(pos) : anchoredAt.GetClosestSurfacePoint(pos);
@@ -474,6 +484,8 @@ public class PlayerController : MonoBehaviour
         {
             t += Time.deltaTime / duration;
             float eased = Mathf.SmoothStep(0f, 1f, t);
+            if (anchor.IsOrbiting)
+                target = anchor.GetSurfacePoint(targetT);
             Vector3 pos = Vector3.Lerp(startPos, target, eased);
 
             // ★ 防御：NaN 不入物理体
@@ -494,6 +506,8 @@ public class PlayerController : MonoBehaviour
         }
 
         // ★ 到达后进入表面移动模式
+        if (anchor.IsOrbiting)
+            target = anchor.GetSurfacePoint(targetT);
         if (!float.IsNaN(target.x) && !float.IsNaN(target.y))
         {
             if (rb != null) rb.MovePosition(target);
@@ -506,7 +520,7 @@ public class PlayerController : MonoBehaviour
         // ★ 初始化 surfaceT 和旋转：根据到达位置
         // 用 rb.position 而非 transform.position，确保读到物理体已同步的位置
         Vector2 attachPos = rb != null ? rb.position : (Vector2)transform.position;
-        surfaceT = anchor.FindClosestSurfaceT(attachPos);
+        surfaceT = anchor.IsOrbiting ? targetT : anchor.FindClosestSurfaceT(attachPos);
         Vector2 initNormal = anchor.GetSurfaceNormal(surfaceT);
         smoothedAngle = Mathf.Atan2(initNormal.y, initNormal.x) * Mathf.Rad2Deg - 90f;
         // 立即应用旋转，不等下一帧 FixedUpdate

@@ -13,7 +13,7 @@ public class PartCollectionUI : MonoBehaviour
     public RectTransform shakeTarget;
 
     [Header("收集弹跳（捡到零件）")]
-    public float popScale = 1.3f;
+    public float popScale = 0.25f;
     public float popDuration = 0.15f;
     public Color popColor = Color.yellow;
 
@@ -43,10 +43,11 @@ public class PartCollectionUI : MonoBehaviour
 
             // 弹跳 + 闪色
             countText.DOKill(true);
+            countText.transform.DOKill();
             countText.transform.localScale = Vector3.one;
-            countText.transform.DOPunchScale(Vector3.one * popScale, popDuration);
+            countText.transform.DOPunchScale(Vector3.one * popScale, popDuration).SetLink(countText.gameObject);
             countText.color = popColor;
-            countText.DOColor(originalColor, popDuration).SetEase(Ease.OutQuad);
+            countText.DOColor(originalColor, popDuration).SetEase(Ease.OutQuad).SetLink(countText.gameObject);
         }
     }
 
@@ -63,14 +64,14 @@ public class PartCollectionUI : MonoBehaviour
         if (shakeTarget != null)
         {
             shakeTarget.DOKill(true);
-            shakeTarget.DOShakePosition(shakeDuration, shakeStrength, shakeVibrato);
+            shakeTarget.DOShakePosition(shakeDuration, shakeStrength, shakeVibrato).SetLink(shakeTarget.gameObject);
         }
 
         if (countText != null)
         {
             countText.DOKill(true);
             countText.color = failFlashColor;
-            countText.DOColor(originalColor, failFlashDuration).SetEase(Ease.OutQuad);
+            countText.DOColor(originalColor, failFlashDuration).SetEase(Ease.OutQuad).SetLink(countText.gameObject);
         }
     }
 }

@@ -3,7 +3,7 @@ using DG.Tweening;
 using TMPro;
 
 /// <summary>
-/// 拾取后增加玩家在吸附状态（星球表面）的移动速度。
+/// 任一玩家拾取后，两名玩家各获得一次星球表面移动加速。
 /// 挂在一个带 Collider2D + isTrigger 的 GameObject 上。
 /// </summary>
 public class SurfaceSpeedBoost : MonoBehaviour
@@ -28,20 +28,31 @@ public class SurfaceSpeedBoost : MonoBehaviour
     [Tooltip("飘字上飘高度")]
     public float popupFloatHeight = 1f;
 
+    bool collected;
+
     void OnTriggerEnter2D(Collider2D other)
     {
-        var pc = other.GetComponent<PlayerController>();
-        if (pc == null) return;
+        if (collected) return;
+        var player = other.GetComponent<PlayerController>();
+        if (player == null) return;
 
-        pc.moveSpeed = Mathf.Min(pc.moveSpeed + speedBonus, maxSpeedCap);
+        collected = true;
+        bool boostedPlayer = ApplyBoost(player);
+        bool boostedTeammate = ApplyBoost(player.otherPlayer);
 
-        if (AudioManager.Instance != null)
+        if ((boostedPlayer || boostedTeammate) && AudioManager.Instance != null)
             AudioManager.Instance.PlayEnergyPickup();
 
-        // ★ 浮字提示：在拾取玩家上方生成「移动速度UP！」
-        ShowSpeedUpPopup(pc.transform);
-
         Destroy(gameObject);
+    }
+
+    bool ApplyBoost(PlayerController player)
+    {
+        if (player == null || !player.TryApplySurfaceSpeedBoost(speedBonus, maxSpeedCap))
+            return false;
+
+        ShowSpeedUpPopup(player.transform);
+        return true;
     }
 
     void ShowSpeedUpPopup(Transform playerTransform)
@@ -65,9 +76,10 @@ public class SurfaceSpeedBoost : MonoBehaviour
         tmp.fontMaterial.SetFloat(ShaderUtilities.ID_UnderlaySoftness, 0.2f);
 
         // DoTween：淡出 + 上飘
-        tmp.DOFade(0f, popupDuration).SetEase(Ease.OutQuad);
+        tmp.DOFade(0f, popupDuration).SetEase(Ease.OutQuad).SetLink(popup);
         popup.transform.DOMoveY(popup.transform.position.y + popupFloatHeight, popupDuration)
             .SetEase(Ease.OutQuad)
+            .SetLink(popup)
             .OnComplete(() => Destroy(popup));
     }
 }

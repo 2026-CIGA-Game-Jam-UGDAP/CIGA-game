@@ -1,5 +1,6 @@
 using UnityEngine;
 using System.Collections;
+using TMPro;
 
 /// <summary>
 /// 陨石生成控制 — 按时间间隔在玩家右上生成陨石。
@@ -36,7 +37,21 @@ public class MeteorManager : MonoBehaviour
     [Tooltip("方向偏离玩家目标区域的角度（度），0 = 精准经过玩家")]
     [SerializeField] float angleSpread = 15f;
 
+    [Header("陨石流")]
+    [SerializeField] bool enableMeteorStorm;
+    [SerializeField, Min(0.05f)] float stormSpawnInterval = 0.25f;
+    [SerializeField, Min(1f)] float stormSpeedMultiplier = 2f;
+    [SerializeField] GameObject stormWarningBanner;
+    [SerializeField] TMP_Text stormWarningText;
+
+    const float StormPeriod = 50f;
+    const float StormDuration = 5f;
+    const float StormWarningDuration = 3f;
+
     float spawnTimer;
+    float timeUntilStorm = StormPeriod;
+    float stormSpawnTimer;
+    int displayedWarningSeconds;
 
     void Start()
     {
@@ -57,15 +72,52 @@ public class MeteorManager : MonoBehaviour
 
     void Update()
     {
-        spawnTimer -= Time.deltaTime;
+        float deltaTime = Time.deltaTime;
+        spawnTimer -= deltaTime;
         if (spawnTimer <= 0f)
         {
             spawnTimer = spawnInterval;
-            TrySpawnMeteor();
+            TrySpawnMeteor(meteorSpeed, true);
+        }
+
+        if (enableMeteorStorm)
+            UpdateMeteorStorm(deltaTime);
+    }
+
+    void UpdateMeteorStorm(float deltaTime)
+    {
+        timeUntilStorm -= deltaTime;
+        if (timeUntilStorm <= -StormDuration)
+        {
+            timeUntilStorm += StormPeriod;
+            stormSpawnTimer = 0f;
+        }
+
+        bool showWarning = deltaTime > 0f && timeUntilStorm > 0f && timeUntilStorm <= StormWarningDuration;
+        if (stormWarningBanner != null && stormWarningBanner.activeSelf != showWarning)
+            stormWarningBanner.SetActive(showWarning);
+
+        if (showWarning && stormWarningText != null)
+        {
+            int seconds = Mathf.CeilToInt(timeUntilStorm);
+            if (displayedWarningSeconds != seconds)
+            {
+                displayedWarningSeconds = seconds;
+                stormWarningText.text = $"陨石流还有{seconds}s来袭";
+            }
+        }
+
+        if (deltaTime <= 0f || timeUntilStorm > 0f) return;
+
+        stormSpawnTimer -= deltaTime;
+        if (stormSpawnTimer <= 0f)
+        {
+            stormSpawnTimer += stormSpawnInterval;
+            TrySpawnMeteor(meteorSpeed * stormSpeedMultiplier, false);
         }
     }
 
-    void TrySpawnMeteor()
+    void TrySpawnMeteor(float speed, bool warnAtSpawnPoint)
     {
         // 随机选一个玩家
         PlayerController target = PickRandomPlayer();
@@ -83,29 +135,29 @@ public class MeteorManager : MonoBehaviour
         Vector2 meteorDir = Quaternion.Euler(0f, 0f, angle) * baseDir;
 
         // 先生成预警
-        if (warningPrefab != null)
+        if (warnAtSpawnPoint && warningPrefab != null)
         {
             GameObject warning = Instantiate(warningPrefab, spawnPos, Quaternion.identity);
             // warning 自己播动画，到时间后由协程销毁
-            StartCoroutine(SpawnMeteorAfterWarning(spawnPos, meteorDir, warning));
+            StartCoroutine(SpawnMeteorAfterWarning(spawnPos, meteorDir, warning, speed));
         }
         else
         {
-            SpawnMeteor(spawnPos, meteorDir);
+            SpawnMeteor(spawnPos, meteorDir, speed);
         }
     }
 
-    IEnumerator SpawnMeteorAfterWarning(Vector2 pos, Vector2 dir, GameObject warning)
+    IEnumerator SpawnMeteorAfterWarning(Vector2 pos, Vector2 dir, GameObject warning, float speed)
     {
         yield return new WaitForSeconds(warningDuration);
 
         if (warning != null)
             Destroy(warning);
 
-        SpawnMeteor(pos, dir);
+        SpawnMeteor(pos, dir, speed);
     }
 
-    void SpawnMeteor(Vector2 pos, Vector2 dir)
+    void SpawnMeteor(Vector2 pos, Vector2 dir, float speed)
     {
         if (meteorPrefab == null)
             return;
@@ -115,7 +167,7 @@ public class MeteorManager : MonoBehaviour
         if (m != null)
         {
             m.direction = dir;
-            m.speed = meteorSpeed;
+            m.speed = speed;
             m.knockbackForce = knockbackForce;
         }
     }

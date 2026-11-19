@@ -34,6 +34,7 @@ public class GameManager : MonoBehaviour
     [Tooltip("场景中 Goal 类型 Pickup 的总数（需捡够这个数才能过关）")]
     public int totalGoalPickups = 5;
     int collectedGoals;
+    ShipProgressLights shipProgress;
 
     [Header("零件 HUD")]
     [Tooltip("右上角零件收集 UI，拖引用")]
@@ -165,6 +166,11 @@ public class GameManager : MonoBehaviour
         if (partHUD != null)
             partHUD.SetDisplayQuiet(0, totalGoalPickups);
 
+        if (shipAnimator != null)
+            shipProgress = shipAnimator.GetComponent<ShipProgressLights>();
+        if (totalGoalPickups > 0)
+            shipProgress?.SetPartsCollected(false);
+
         // 开局黑屏，等绳子就位后淡出
         if (fadeImage != null)
             fadeImage.color = Color.black;
@@ -265,8 +271,12 @@ public class GameManager : MonoBehaviour
             partHUD.UpdateDisplay(collectedGoals, totalGoalPickups);
 
         // 全部零件收集完毕
-        if (collectedGoals >= totalGoalPickups && AudioManager.Instance != null)
-            AudioManager.Instance.PlayAllCollected();
+        if (collectedGoals == totalGoalPickups)
+        {
+            shipProgress?.SetPartsCollected(true);
+            if (AudioManager.Instance != null)
+                AudioManager.Instance.PlayAllCollected();
+        }
 
         CheckShipCondition();
     }
@@ -353,10 +363,7 @@ public class GameManager : MonoBehaviour
         // 触发飞船动画
         if (shipAnimator != null)
         {
-            var progressLights = shipAnimator.GetComponent<ShipProgressLights>();
-            if (progressLights != null)
-                progressLights.CompleteLevel();
-
+            shipProgress?.CompleteLevel();
             shipAnimator.SetTrigger(shipAnimTrigger);
         }
 

@@ -21,13 +21,16 @@ public class AnchorPoint : MonoBehaviour
 
     List<PlayerController> playersInRange = new List<PlayerController>();
     List<PlayerController> anchoredPlayers = new List<PlayerController>();
+    OrbitAround orbit;
 
     public float SurfaceLength => 2f * Mathf.PI * moveRadius;
+    internal bool IsOrbiting => orbit != null && orbit.isActiveAndEnabled;
     /// <summary>t 增加方向 = 逆时针，所以左右移动符号为 -1</summary>
     public float MoveDirectionSign => -1f;
 
     void Awake()
     {
+        TryGetComponent(out orbit);
         float srcRadius = 0f;
         if (moveRadius <= 0f)
         {
@@ -64,11 +67,16 @@ public class AnchorPoint : MonoBehaviour
 
     // ============ 圆形表面接口 ============
 
-    public Vector2 GetSurfacePoint(float t)
+    public Vector2 GetSurfacePoint(float t) => GetSurfacePoint(t, transform.position);
+
+    internal Vector2 GetPhysicsSurfacePoint(float t) =>
+        GetSurfacePoint(t, IsOrbiting ? orbit.StepPosition : (Vector2)transform.position);
+
+    Vector2 GetSurfacePoint(float t, Vector2 center)
     {
-        if (moveRadius <= 0f) return transform.position;
+        if (moveRadius <= 0f) return center;
         float angle = t / moveRadius;
-        return (Vector2)transform.position + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * moveRadius;
+        return center + new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * moveRadius;
     }
 
     public Vector2 GetSurfaceNormal(float t)
