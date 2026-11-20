@@ -2512,12 +2512,9 @@ MonoBehaviour:
   enterDialogue: {fileID: 11400000, guid: 0caf7eb80da931b4db0345227220760e, type: 2}
   afterDetachDialogue: {fileID: 11400000, guid: d104c02c132e30d4ea31f58ac1f57437, type: 2}
   afterAttachDialogue: {fileID: 11400000, guid: 12ae1f4608eabe94dae7b068ab204ca6, type: 2}
-  afterJetpackDialogue: {fileID: 11400000, guid: bdf852555518f904c81488119ae5057b, type: 2}
-  afterExitDialogue: {fileID: 11400000, guid: f867185a386a4b646a1c8fb74a8fa801, type: 2}
   approachDockDialogue: {fileID: 0}
   afterRechargeDialogue: {fileID: 11400000, guid: fcca381639be6a145b97e424395875a3, type: 2}
   afterRechargeGoToShipDialogue: {fileID: 11400000, guid: 1701220ebdcc1dc42a870c5cc16e308d, type: 2}
-  tutorialPlatformRightX: 12
   tutorialFirstPlanet: {fileID: 927768737}
   tutorialCamera: {fileID: 568031475}
   afterReachShipDialogue: {fileID: 11400000, guid: a722a24dfe5d4414586d0d7023272d4b, type: 2}

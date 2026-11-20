@@ -75,17 +75,12 @@ public class GameManager : MonoBehaviour
     public DialogueSO afterDetachDialogue;
     [Tooltip("（关卡0）同一玩家解除后重新吸附时播放的对话")]
     public DialogueSO afterAttachDialogue;
-    [Tooltip("（关卡0）任一玩家首次喷气后播放的对话")]
-    public DialogueSO afterJetpackDialogue;
-    [Tooltip("（关卡0）任一玩家到达平台右侧后的喷气提示")]
-    public DialogueSO afterExitDialogue;
     [Tooltip("（关卡0）玩家靠近出入口，提示需要同时站在标记区域")]
     public DialogueSO approachDockDialogue;
     [Tooltip("（关卡0）吸附第一颗星球并触碰能量后播放的对话")]
     public DialogueSO afterRechargeDialogue;
     [Tooltip("（关卡0）飞船进入主摄像机视野后播放的对话")]
     public DialogueSO afterRechargeGoToShipDialogue;
-    [SerializeField] float tutorialPlatformRightX;
     [SerializeField] AnchorPoint tutorialFirstPlanet;
     [SerializeField] Camera tutorialCamera;
     [Tooltip("零件收齐后，任一玩家回到飞船时播放的双人对接引导（无零件的关卡直接在登船时播放）")]
@@ -117,8 +112,6 @@ public class GameManager : MonoBehaviour
     bool enterDialoguePlayed;
     bool detachDialogueTriggered;
     bool attachDialogueTriggered;
-    bool jetpackDialogueTriggered;
-    bool exitDialogueTriggered;
     bool approachDockDialoguePending;
     bool approachDockDialogueTriggered;
     bool rechargeDialogueTriggered;
@@ -132,7 +125,6 @@ public class GameManager : MonoBehaviour
     bool energyTutorialTriggered;
 
     // 玩家操作标志（其他脚本设置）
-    bool jetpackUsed;
     bool player1Attached;
     bool player2Attached;
     [System.NonSerialized] public bool meteorImpactTriggered;
@@ -250,18 +242,6 @@ public class GameManager : MonoBehaviour
         CheckShipCondition();
     }
 
-    /// <summary>ShipDockTrigger 调用：玩家进入对接区</summary>
-    public void OnPlayerDocked()
-    {
-        CheckShipCondition();
-    }
-
-    /// <summary>ShipDockTrigger 调用：玩家离开对接区</summary>
-    public void OnPlayerUndocked()
-    {
-        // 离开时不需要额外处理，CheckShipCondition 会在下次进入/收集时再判
-    }
-
     /// <summary>Goal 类型 Pickup 被拾取时调用</summary>
     public void OnGoalPickupCollected()
     {
@@ -277,8 +257,6 @@ public class GameManager : MonoBehaviour
             if (AudioManager.Instance != null)
                 AudioManager.Instance.PlayAllCollected();
         }
-
-        CheckShipCondition();
     }
 
     /// <summary>绳索断裂时 Obi 调用 — 暂时禁用重开</summary>
@@ -291,7 +269,7 @@ public class GameManager : MonoBehaviour
 
     public void ResetLevel()
     {
-        if (hasWon || resetting) return;
+        if (shipAnimating || hasWon || resetting) return;
         resetting = true;
         StartCoroutine(ResetLevelAsync());
     }
@@ -327,19 +305,13 @@ public class GameManager : MonoBehaviour
     void CheckShipCondition()
     {
         if (PauseMenu.IsOpen) return;
-        if (shipAnimating || hasWon || resetting || collectedGoals < totalGoalPickups) return;
+        if (IsInitializing || shipAnimating || hasWon || resetting || collectedGoals < totalGoalPickups) return;
 
         if (dockTrigger1 == null || dockTrigger2 == null)
         {
             return;
         }
         if (!dockTrigger1.HasPlayer || !dockTrigger2.HasPlayer)
-        {
-            return;
-        }
-
-        // 两个 trigger 里必须是不同玩家
-        if (dockTrigger1.DockedPlayer == dockTrigger2.DockedPlayer)
         {
             return;
         }
@@ -352,6 +324,12 @@ public class GameManager : MonoBehaviour
             if (afterReachShipDialogue != null && !reachShipDialogueTriggered) return;
         }
 
+        // 两扇门都重新查询，避免用上一物理帧的就位状态发船。
+        dockTrigger1.RefreshDockedPlayer();
+        dockTrigger2.RefreshDockedPlayer();
+        if (!dockTrigger1.HasPlayer || !dockTrigger2.HasPlayer ||
+            dockTrigger1.DockedPlayer == dockTrigger2.DockedPlayer) return;
+
         Debug.Log("[Ship] 条件满足，启动飞船动画！");
         StartCoroutine(ShipLaunchSequence());
     }
@@ -359,6 +337,10 @@ public class GameManager : MonoBehaviour
     System.Collections.IEnumerator ShipLaunchSequence()
     {
         shipAnimating = true;
+        dockTrigger1.DockedPlayer.LockForShipLaunch();
+        dockTrigger2.DockedPlayer.LockForShipLaunch();
+        dockTrigger1.MarkLaunched();
+        dockTrigger2.MarkLaunched();
 
         // 触发飞船动画
         if (shipAnimator != null)
@@ -369,12 +351,6 @@ public class GameManager : MonoBehaviour
 
         // 等动画播完
         yield return new WaitForSeconds(shipAnimDuration);
-
-        // 标记已发射，阻止重复触发
-        if (dockTrigger1 != null)
-            dockTrigger1.MarkLaunched();
-        if (dockTrigger2 != null)
-            dockTrigger2.MarkLaunched();
 
         // 关闭两个对接触发器
         if (dockTrigger1 != null)
@@ -463,26 +439,9 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // 到达平台右侧后，介绍喷气背包和按键。
-        if (attachDialogueTriggered && !exitDialogueTriggered && afterExitDialogue != null &&
-            ((player1 != null && player1.transform.position.x >= tutorialPlatformRightX) ||
-             (player2 != null && player2.transform.position.x >= tutorialPlatformRightX)))
-        {
-            exitDialogueTriggered = true;
-            DialogueManager.Instance.StartDialogue(afterExitDialogue);
-            return;
-        }
-
-        if (exitDialogueTriggered && !jetpackDialogueTriggered && jetpackUsed && afterJetpackDialogue != null)
-        {
-            jetpackDialogueTriggered = true;
-            DialogueManager.Instance.StartDialogue(afterJetpackDialogue);
-            return;
-        }
-
-        // 关卡 0 的能量站提示排在喷气和耗能说明之后。
+        // 关卡 0 的能量站提示排在背包按键提示之后。
         if (energyTutorialPending && energyTutorialDialogue != null &&
-            (tutorialFirstPlanet == null || jetpackDialogueTriggered))
+            (tutorialFirstPlanet == null || attachDialogueTriggered))
         {
             energyTutorialPending = false;
             energyTutorialTriggered = true;
@@ -494,7 +453,7 @@ public class GameManager : MonoBehaviour
         }
 
         // 6.5 靠近出入口提示对话（关卡0：玩家靠近出入口时触发，提示同时站在标记区域）
-        if (exitDialogueTriggered && !approachDockDialogueTriggered &&
+        if (attachDialogueTriggered && !approachDockDialogueTriggered &&
             approachDockDialoguePending && approachDockDialogue != null)
         {
             approachDockDialoguePending = false;
@@ -504,7 +463,7 @@ public class GameManager : MonoBehaviour
         }
 
         // 两位玩家共享教学进度，吸附和拾取可以按任意顺序完成。
-        if (jetpackDialogueTriggered && !rechargeDialogueTriggered &&
+        if (attachDialogueTriggered && !rechargeDialogueTriggered &&
             landedOnFirstPlanet && touchedEnergy && afterRechargeDialogue != null)
         {
             rechargeDialogueTriggered = true;
@@ -579,11 +538,6 @@ public class GameManager : MonoBehaviour
     {
         if (playerIndex == 0) player1Detached = true;
         else player2Detached = true;
-    }
-
-    public void OnPlayerJetpacked()
-    {
-        jetpackUsed = true;
     }
 
     public void OnPlayerAttached(int playerIndex, Component anchor)

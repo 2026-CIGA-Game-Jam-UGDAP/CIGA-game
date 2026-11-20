@@ -4,15 +4,14 @@ using DG.Tweening;
 
 /// <summary>
 /// 飞船对接触发器。挂在 triggerDown / triggerUp 上。
-/// 根据实际重叠的玩家通知 GameManager 检查对接条件，显示等待队友提示。
-/// 不锁定玩家移动——玩家可自由进出。
+/// 玩家持续停留在舱门区域后才视为就位，离开即清除。
 /// </summary>
 public class ShipDockTrigger : MonoBehaviour
 {
     [Tooltip("场景中的 GameManager")]
     public GameManager gameManager;
 
-    [Tooltip("等待队友提示（世界空间 UI），有玩家时显示")]
+    [Tooltip("等待队友提示（世界空间 UI），玩家就位后显示")]
     public GameObject waitingText;
 
     [Tooltip("出入口的半透明角色剪影，未就位且零件收齐时显示")]
@@ -20,6 +19,9 @@ public class ShipDockTrigger : MonoBehaviour
     [Tooltip("剪影上方指向站位的箭头")]
     public Transform guideArrow;
 
+    const double RequiredHoldSeconds = 0.5;
+    PlayerController candidate;
+    double candidateSince;
     PlayerController dockedPlayer;
     bool shipLaunched;
     Collider2D dockCollider;
@@ -44,6 +46,7 @@ public class ShipDockTrigger : MonoBehaviour
 
     void OnDisable()
     {
+        candidate = null;
         SetDockedPlayer(null);
         SetGuideVisible(false);
     }
@@ -63,22 +66,11 @@ public class ShipDockTrigger : MonoBehaviour
         RefreshDockedPlayer();
     }
 
-    void OnTriggerEnter2D(Collider2D other)
-    {
-        RefreshDockedPlayer();
-    }
-
-    void OnTriggerExit2D(Collider2D other)
-    {
-        RefreshDockedPlayer();
-    }
-
-    void RefreshDockedPlayer()
+    internal void RefreshDockedPlayer()
     {
         if (!isActiveAndEnabled || shipLaunched) return;
 
-        // OnEnable 时物理世界可能还没同步，Enter/Exit 也可能因启用或多个碰撞体漏记。
-        // 每个物理帧核对实际重叠，不需要玩家退出后重新进入。
+        // 按物理帧核对实际重叠，发船前也用同一份物理状态复核两扇门。
         PlayerController player = null;
         if (dockCollider != null && dockCollider.enabled)
         {
@@ -86,12 +78,12 @@ public class ShipDockTrigger : MonoBehaviour
             for (int i = 0; i < count; i++)
             {
                 var pc = overlaps[i].GetComponentInParent<PlayerController>();
-                if (pc == null) continue;
+                if (pc == null || !pc.isActiveAndEnabled || pc.IsFlyingToAnchor) continue;
 
                 if (player == null) player = pc;
 
-                // 同一玩家可能有多个碰撞体；只要仍有一个在区域内，就保留对接状态。
-                if (pc == dockedPlayer)
+                // 同一玩家可能有多个碰撞体，候选仍在区域内时继续计时。
+                if (pc == candidate)
                 {
                     player = pc;
                     break;
@@ -99,7 +91,14 @@ public class ShipDockTrigger : MonoBehaviour
             }
         }
 
-        SetDockedPlayer(player);
+        double now = Time.fixedTimeAsDouble;
+        if (!ReferenceEquals(candidate, player))
+        {
+            candidate = player;
+            candidateSince = now;
+        }
+
+        SetDockedPlayer(candidate != null && now - candidateSince >= RequiredHoldSeconds ? candidate : null);
     }
 
     void SetDockedPlayer(PlayerController player)
@@ -108,13 +107,6 @@ public class ShipDockTrigger : MonoBehaviour
 
         dockedPlayer = player;
         RefreshWaitingText();
-        if (gameManager != null)
-        {
-            if (HasPlayer)
-                gameManager.OnPlayerDocked();
-            else
-                gameManager.OnPlayerUndocked();
-        }
     }
 
     /// <summary>刷新等待队友提示：本 Dock 有玩家时显示</summary>

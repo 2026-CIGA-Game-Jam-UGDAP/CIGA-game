@@ -108,7 +108,7 @@ public class PlayerController : MonoBehaviour
     float surfaceT;           // 玩家在表面上的当前距离（沿周长，圆和多边形统一）
     float smoothedAngle;      // 平滑后的当前旋转角度（度），用于 LerpAngle
     bool wasJetting;          // 上一帧是否喷气，用于检测推进器音效 Start/Stop
-    bool hasUsedJetpack;
+    bool lockedForShipLaunch;
 
     // ---- 生命周期 ----
 
@@ -146,7 +146,7 @@ public class PlayerController : MonoBehaviour
     void Update()
     {
         // 初始化/对话中禁用所有输入
-        if (GameManager.IsInitializing || DialogueManager.IsActive || PauseMenu.IsOpen) return;
+        if (lockedForShipLaunch || GameManager.IsInitializing || DialogueManager.IsActive || PauseMenu.IsOpen) return;
 
         // ★ 持续喷气：FixedUpdate 中直接读取 GetKey，这里不需要额外处理
 
@@ -208,7 +208,7 @@ public class PlayerController : MonoBehaviour
     void FixedUpdate()
     {
         // 初始化/对话中禁用所有物理移动
-        if (GameManager.IsInitializing || DialogueManager.IsActive)
+        if (lockedForShipLaunch || GameManager.IsInitializing || DialogueManager.IsActive)
         {
             IsJetting = false;
             return;
@@ -281,11 +281,6 @@ public class PlayerController : MonoBehaviour
 
         if (jetting)
         {
-            if (!hasUsedJetpack)
-            {
-                hasUsedJetpack = true;
-                GameManager.Instance?.OnPlayerJetpacked();
-            }
             float drain = jetEnergyDrainRate * Time.fixedDeltaTime;
             currentEnergy -= drain;
             if (currentEnergy < 0f) currentEnergy = 0f;
@@ -355,11 +350,29 @@ public class PlayerController : MonoBehaviour
         return world;
     }
 
+    /// <summary>发船动画开始后留在舱门位置，直到场景切换。</summary>
+    internal void LockForShipLaunch()
+    {
+        lockedForShipLaunch = true;
+        IsJetting = false;
+        if (wasJetting) AudioManager.Instance?.StopThruster(transform);
+        wasJetting = false;
+        if (animator != null) animator.SetBool("IsWalking", false);
+
+        if (rb != null)
+        {
+            rb.velocity = Vector2.zero;
+            rb.angularVelocity = 0f;
+            rb.constraints = RigidbodyConstraints2D.FreezeAll;
+        }
+    }
+
     // ---- Module 4: 锚点吸附（切换行为）----
 
     /// <summary>锚点调用：平滑飞到圆表面最近点，之后在表面切向移动</summary>
     public void AttachToAnchor(AnchorPoint anchor, float speed)
     {
+        if (lockedForShipLaunch) return;
         if (!isAnchored && !isFlyingToAnchor)
         {
             Debug.Log($"[PlayerController] Player{playerIndex} AttachToAnchor(AnchorPoint): anchor={anchor.name}, speed={speed}");
@@ -374,6 +387,7 @@ public class PlayerController : MonoBehaviour
     /// <summary>锚点调用：平滑飞到多边形表面最近点，之后在表面切向移动</summary>
     public void AttachToAnchor(PolyAnchorPoint anchor, float speed)
     {
+        if (lockedForShipLaunch) return;
         if (!isAnchored && !isFlyingToAnchor)
         {
             Debug.Log($"[PlayerController] Player{playerIndex} AttachToAnchor(PolyAnchorPoint): anchor={anchor.name}, speed={speed}");
@@ -388,6 +402,7 @@ public class PlayerController : MonoBehaviour
     /// <summary>锚点调用：解除吸附，恢复自由移动</summary>
     public void DetachFromAnchor()
     {
+        if (lockedForShipLaunch) return;
         string anchorName = "null";
         if ((Component)anchoredAt != null) anchorName = ((Component)anchoredAt).name;
         else if ((Component)polyAnchoredAt != null) anchorName = ((Component)polyAnchoredAt).name;
