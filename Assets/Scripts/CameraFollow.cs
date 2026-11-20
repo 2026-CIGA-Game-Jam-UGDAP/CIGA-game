@@ -27,6 +27,12 @@ public class CameraFollow : MonoBehaviour
     [Tooltip("额外边距，防止玩家贴边")]
     public float zoomPadding = 3f;
 
+    [Tooltip("用于限制取景范围的关卡背景")]
+    [SerializeField] SpriteRenderer background;
+
+    // 给两个玩家同时触发的镜头抖动留出余量。
+    const float BackgroundPadding = 1f;
+
     Camera cam;
 
     void Start()
@@ -45,7 +51,7 @@ public class CameraFollow : MonoBehaviour
         Vector3 mid = (player1.transform.position + player2.transform.position) / 2f;
         mid.z = transform.position.z;
 
-        transform.position = Vector3.Lerp(
+        Vector3 position = Vector3.Lerp(
             transform.position,
             mid,
             smoothSpeed * Time.deltaTime
@@ -56,10 +62,29 @@ public class CameraFollow : MonoBehaviour
         float targetZoom = dist + zoomPadding;
         targetZoom = Mathf.Clamp(targetZoom, minZoom, maxZoom);
 
-        cam.orthographicSize = Mathf.Lerp(
+        float zoom = Mathf.Lerp(
             cam.orthographicSize,
             targetZoom,
             zoomSmoothSpeed * Time.deltaTime
         );
+
+        KeepViewInsideBackground(background, cam.aspect, ref position, ref zoom);
+        transform.position = position;
+        cam.orthographicSize = zoom;
+    }
+
+    internal static void KeepViewInsideBackground(SpriteRenderer background, float aspect, ref Vector3 position, ref float zoom)
+    {
+        if (background == null || background.sprite == null) return;
+
+        Bounds bounds = background.bounds;
+        float availableHalfHeight = bounds.extents.y - BackgroundPadding;
+        float availableHalfWidth = bounds.extents.x - BackgroundPadding;
+        zoom = Mathf.Min(zoom, Mathf.Min(availableHalfHeight, availableHalfWidth / aspect));
+
+        float horizontalInset = zoom * aspect + BackgroundPadding;
+        float verticalInset = zoom + BackgroundPadding;
+        position.x = Mathf.Clamp(position.x, bounds.min.x + horizontalInset, bounds.max.x - horizontalInset);
+        position.y = Mathf.Clamp(position.y, bounds.min.y + verticalInset, bounds.max.y - verticalInset);
     }
 }

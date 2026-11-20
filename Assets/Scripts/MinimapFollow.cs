@@ -12,11 +12,16 @@ public class MinimapFollow : MonoBehaviour
     [Tooltip("玩家 2 的 PlayerController")]
     public PlayerController player2;
 
+    [Tooltip("用于限制取景范围的关卡背景")]
+    [SerializeField] SpriteRenderer background;
+
     Camera cam;
+    float targetZoom;
 
     void Start()
     {
         cam = GetComponent<Camera>();
+        if (cam != null) targetZoom = cam.orthographicSize;
     }
 
     void LateUpdate()
@@ -26,6 +31,9 @@ public class MinimapFollow : MonoBehaviour
 
         Vector3 mid = (player1.transform.position + player2.transform.position) / 2f;
         mid.z = transform.position.z;
+        float zoom = targetZoom;
+        CameraFollow.KeepViewInsideBackground(background, cam.aspect, ref mid, ref zoom);
         transform.position = mid;
+        cam.orthographicSize = zoom;
     }
 }

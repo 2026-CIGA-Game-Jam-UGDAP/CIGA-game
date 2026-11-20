@@ -373,6 +373,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   player1: {fileID: 8679928150463363026}
   player2: {fileID: 7569925495526235528}
+  background: {fileID: 2103910852}
 --- !u!114 &91610054
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -581,10 +582,10 @@ PolygonCollider2D:
   m_AutoTiling: 0
   m_Points:
     m_Paths:
-    - - {x: 25.849255, y: 13.209618}
-      - {x: -16.80574, y: 12.616709}
-      - {x: -17.36559, y: -21.113409}
-      - {x: 23.943218, y: -19.9187}
+    - - {x: 51, y: 22}
+      - {x: -43, y: 22}
+      - {x: -43, y: -27}
+      - {x: 51, y: -27}
   m_UseDelaunayMesh: 0
 --- !u!4 &451975243
 Transform:
@@ -784,6 +785,7 @@ MonoBehaviour:
   minZoom: 4
   maxZoom: 12
   zoomPadding: 3
+  background: {fileID: 2103910852}
 --- !u!114 &519420036
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -1178,10 +1178,10 @@ PolygonCollider2D:
   m_AutoTiling: 0
   m_Points:
     m_Paths:
-    - - {x: 86.3764, y: 28.729418}
-      - {x: -26.005566, y: 25.67791}
-      - {x: -23.74136, y: -31.277332}
-      - {x: 85.35553, y: -32.741714}
+    - - {x: 99, y: 34}
+      - {x: -41, y: 34}
+      - {x: -41, y: -40}
+      - {x: 99, y: -40}
   m_UseDelaunayMesh: 0
 --- !u!4 &490661533
 Transform:
@@ -2098,6 +2098,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   player1: {fileID: 372500743}
   player2: {fileID: 487993650}
+  background: {fileID: 1606352421}
 --- !u!20 &1088883162
 Camera:
   m_ObjectHideFlags: 0
@@ -2842,6 +2843,7 @@ MonoBehaviour:
   minZoom: 4
   maxZoom: 12
   zoomPadding: 3
+  background: {fileID: 1606352421}
 --- !u!114 &1678915591
 MonoBehaviour:
   m_ObjectHideFlags: 0
